@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Screen Share Pro — Universal Mirroring</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="header">
+            <div class="logo">
+                <i class="fa-solid fa-display-arrow-down"></i>
+                <span>Screen<b>Share</b> Pro</span>
+            </div>
+            <div class="header-right">
+                <div class="badge-status" id="connectionStatus">
+                    <span class="status-dot"></span> <span id="statusText">Ulanmagan</span>
+                </div>
+                <button class="btn-pro" id="openProModalBtn">
+                    <i class="fa-solid fa-crown"></i> <span id="proBtnText">PRO Kalit</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="main-content">
+            <!-- LEFT / CONTROL PANEL -->
+            <section class="sidebar">
+                <!-- Qurilma ma'lumoti -->
+                <div class="card device-info-card">
+                    <h3><i class="fa-solid fa-network-wired"></i> Lokal Tarmoq (LAN/Wi-Fi)</h3>
+                    <p class="text-muted">Telefon yoki televizordan ushbu manzilga kiring:</p>
+                    <div class="url-box" id="serverUrlBox">Yuklanmoqda...</div>
+                    <div class="qr-container">
+                        <img id="qrCodeImg" src="" alt="QR Kod">
+                        <span class="text-hint">Kamerani yaqinlashtiring</span>
+                    </div>
+                </div>
+
+                <!-- Xona va Ulanish -->
+                <div class="card room-card">
+                    <h3><i class="fa-solid fa-door-open"></i> Xonaga ulanish</h3>
+                    <div class="input-group">
+                        <label>Sizning qurilmangiz:</label>
+                        <select id="deviceTypeSelect">
+                            <option value="pc">💻 Kompyuter (PC)</option>
+                            <option value="phone">📱 Telefon (Mobile)</option>
+                            <option value="tv">📺 Televizor (Smart TV)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Xona PIN kodi:</label>
+                        <div class="room-pin-wrap">
+                            <input type="text" id="roomIdInput" value="777888" maxlength="8">
+                            <button class="btn-small" id="generatePinBtn" title="Yangi PIN"><i class="fa-solid fa-arrows-rotate"></i></button>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="joinRoomBtn">
+                        <i class="fa-solid fa-plug"></i> Xonaga qo'shilish
+                    </button>
+                </div>
+
+                <!-- Ulangan Qurilmalar -->
+                <div class="card devices-card">
+                    <h3><i class="fa-solid fa-users"></i> Ulangan qurilmalar (<span id="deviceCount">0</span>)</h3>
+                    <ul class="device-list" id="deviceList">
+                        <li class="empty-list">Hozircha xonada hech kim yo'q</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- RIGHT / VIDEO STREAM AREA -->
+            <section class="viewport-area">
+                <!-- Toolbar / Boshqaruv tugmalari -->
+                <div class="stream-toolbar">
+                    <button class="btn-action" id="startShareBtn" disabled>
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i> Ekranni uzatish
+                    </button>
+                    <button class="btn-action btn-danger" id="stopShareBtn" style="display: none;">
+                        <i class="fa-solid fa-circle-stop"></i> Uzatishni to'xtatish
+                    </button>
+                    
+                    <!-- Taymer / Status -->
+                    <div class="timer-badge" id="sessionTimerBadge">
+                        <i class="fa-solid fa-clock"></i> <span id="timerDisplay">10:00 (Free)</span>
+                    </div>
+
+                    <button class="btn-icon" id="fullscreenBtn" title="To'liq ekran">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
+
+                <!-- Video Konteyner -->
+                <div class="video-container" id="videoContainer">
+                    <video id="remoteVideo" autoplay playsinline muted></video>
+                    
+                    <!-- Bo'sh turgandagi plakat -->
+                    <div class="empty-state" id="emptyVideoState">
+                        <i class="fa-solid fa-tower-broadcast"></i>
+                        <h3>Ekran uzatish kutilmoqda</h3>
+                        <p>Xonaga qo'shiling va "Ekranni uzatish" tugmasini bosing</p>
+                    </div>
+
+                    <!-- Suv belgisi (Watermark) -->
+                    <div class="watermark" id="appWatermark">
+                        <span>ScreenShare Pro (Free Version)</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- PRO / MASTER KOD MODAL OYNASI -->
+    <div class="modal-overlay" id="proModal">
+        <div class="modal-content">
+            <button class="close-modal-btn" id="closeProModalBtn">&times;</button>
+            <div class="modal-header">
+                <i class="fa-solid fa-crown pro-icon"></i>
+                <h2>PRO Litsenziya / Master Kod</h2>
+            </div>
+            <div class="modal-body">
+                <p>PRO rejimda quyidagi cheklovlar to'liq olinadi:</p>
+                <ul class="pro-features">
+                    <li><i class="fa-solid fa-check"></i> Cheksiz ulanish vaqti (Taymersiz)</li>
+                    <li><i class="fa-solid fa-check"></i> 1080p / 4K Ultra-HD va 60 FPS</li>
+                    <li><i class="fa-solid fa-check"></i> Suv belgisi (Watermark) butunlay yo'qoladi</li>
+                    <li><i class="fa-solid fa-check"></i> Wi-Fi Hotspot & Bluetooth tezkor ulanish</li>
+                </ul>
+                <div class="input-group">
+                    <label>Master PRO Kodni kiriting:</label>
+                    <input type="text" id="proCodeInput" placeholder="Masalan: SCREEN-PRO-7777">
+                </div>
+                <div id="proMessage" class="modal-message"></div>
+                <button class="btn-primary btn-pro-submit" id="submitProCodeBtn">
+                    Faollashtirish
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

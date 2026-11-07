@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">ScreenShare Pro</string>
+    <string name="connect">Ulanish</string>
+    <string name="start_stream">Ekranni uzatish</string>
+    <string name="stop_stream">Uzatishni to\'xtatish</string>
+    <string name="server_ip_hint">Server IP (masalan: 192.168.1.100)</string>
+    <string name="room_pin_hint">Xona PIN kodi (777888)</string>
+</resources>

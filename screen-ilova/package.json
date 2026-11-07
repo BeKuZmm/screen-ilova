@@ -1,0 +1,29 @@
+{
+  "name": "screen-share-pro",
+  "version": "1.0.0",
+  "description": "Universal Screen Sharing & Remote Mirroring App for PC, Phone, and TV",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js"
+  },
+  "keywords": [
+    "screen-sharing",
+    "webrtc",
+    "screen-mirroring",
+    "android",
+    "tv",
+    "windows"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3",
+    "selfsigned": "^5.5.0",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0"
+  }
+}
