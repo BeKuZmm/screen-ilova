@@ -16,15 +16,16 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
+import android.util.Base64
 import androidx.core.app.NotificationCompat
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -36,6 +37,9 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var socket: Socket? = null
     private var streamJob: Job? = null
+
+    private var handlerThread: HandlerThread? = null
+    private var backgroundHandler: Handler? = null
 
     companion object {
         const val CHANNEL_ID = "ScreenCaptureServiceChannel"
@@ -123,6 +127,10 @@ class ScreenCaptureService : Service() {
         port: Int,
         roomPin: String
     ) {
+        // Fon oqimini Looper bilan yaratish (ImageReader xabarlari uchun shart!)
+        handlerThread = HandlerThread("ScreenCaptureLoop").apply { start() }
+        backgroundHandler = Handler(handlerThread!!.looper)
+
         streamJob = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val opts = IO.Options().apply {
@@ -142,7 +150,6 @@ class ScreenCaptureService : Service() {
                     socket?.emit("join-as-sender", joinData)
                     socket?.emit("join-room", joinData)
 
-                    // Muvaffaqiyatli ulanish xabari
                     sendBroadcast(Intent(ACTION_STREAM_CONNECTED).setPackage(packageName))
                 }
 
@@ -183,14 +190,13 @@ class ScreenCaptureService : Service() {
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     imageReader?.surface,
                     null,
-                    null
+                    backgroundHandler
                 )
 
                 var lastFrameTime = 0L
                 val frameInterval = 1000L / 30L // 30 FPS
 
                 imageReader?.setOnImageAvailableListener({ reader ->
-                    if (!isActive) return@setOnImageAvailableListener
                     val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     val now = System.currentTimeMillis()
                     if (now - lastFrameTime < frameInterval) {
@@ -204,16 +210,16 @@ class ScreenCaptureService : Service() {
                         val buffer = planes[0].buffer
                         val pixelStride = planes[0].pixelStride
                         val rowStride = planes[0].rowStride
-                        val rowPadding = rowStride - pixelStride * targetWidth
+                        val stridePixels = rowStride / pixelStride
 
                         val bitmap = Bitmap.createBitmap(
-                            targetWidth + rowPadding / pixelStride,
+                            stridePixels,
                             targetHeight,
                             Bitmap.Config.ARGB_8888
                         )
                         bitmap.copyPixelsFromBuffer(buffer)
 
-                        val finalBitmap = if (rowPadding > 0) {
+                        val finalBitmap = if (stridePixels > targetWidth) {
                             Bitmap.createBitmap(bitmap, 0, 0, targetWidth, targetHeight)
                         } else {
                             bitmap
@@ -222,10 +228,11 @@ class ScreenCaptureService : Service() {
                         val baos = ByteArrayOutputStream()
                         finalBitmap.compress(Bitmap.CompressFormat.JPEG, 65, baos)
                         val jpegBytes = baos.toByteArray()
+                        val base64Data = "data:image/jpeg;base64," + Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
 
                         if (socket?.connected() == true) {
-                            socket?.emit("screen-frame", jpegBytes)
-                            socket?.emit("mobile-frame", jpegBytes)
+                            socket?.emit("screen-frame", base64Data)
+                            socket?.emit("mobile-frame", base64Data)
                         }
 
                         if (finalBitmap != bitmap) {
@@ -233,11 +240,10 @@ class ScreenCaptureService : Service() {
                         }
                         bitmap.recycle()
                     } catch (e: Exception) {
-                        // Kadr o'tkaziladi
                     } finally {
                         image.close()
                     }
-                }, null)
+                }, backgroundHandler)
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -253,6 +259,10 @@ class ScreenCaptureService : Service() {
             imageReader?.close()
             mediaProjection?.stop()
         } catch (e: Exception) {}
+
+        handlerThread?.quitSafely()
+        handlerThread = null
+        backgroundHandler = null
 
         socket?.emit("stop-stream")
         socket?.emit("stop-streaming")

@@ -37,7 +37,7 @@ let senderInterval = null;
 let frameCount = 0;
 let lastFpsTime = performance.now();
 
-// KADR RASMI
+// KADRNI CHIZISH
 const streamImg = new Image();
 streamImg.onload = () => {
     if (!screenCanvas || !canvasCtx) return;
@@ -72,19 +72,17 @@ streamImg.onload = () => {
 
 let activeBlobUrl = null;
 
-// FAQAT TASHQI QURILMALARDAN KELGAN KADRLARNI CHIZISH
 function renderIncomingFrame(data) {
-    // Agar kompyuter o'z ekranini uzatayotgan bo'lsa, uni o'ziga chizmaslik (Loopback / Cheksiz oyna oldini olish!)
-    if (isCapturingDesktop) return;
+    if (isCapturingDesktop) return; // Kompyuter o'zini o'zi chizmasligi uchun
 
-    // 1. Agar kutish paneli ochiq bo'lsa, uni yopib jonli efirni ochamiz
+    // 1. Kutish panelini yopib, jonli efir oynasini ko'rsatish
     if (qrWaitingPanel && qrWaitingPanel.style.display !== 'none') {
         qrWaitingPanel.style.display = 'none';
         liveStreamPanel.style.display = 'flex';
         switchTab('receiver');
     }
 
-    // 2. Ma'lumot turiga qarab rasmga yuklaymiz
+    // 2. Kadrni yuklash (Base64 yoki ArrayBuffer)
     if (typeof data === 'string') {
         streamImg.src = data.startsWith('data:') ? data : `data:image/jpeg;base64,${data}`;
     } else {
@@ -95,18 +93,23 @@ function renderIncomingFrame(data) {
     }
 }
 
-// FAQAT SERVERDAN TARKATILGAN KADRLARNI TINGLASH (o'zining screen-frame hodisasini tinglamaslik!)
+// SERVER HODISALARI
 socket.on('incoming-screen-frame', renderIncomingFrame);
 socket.on('mobile-frame', renderIncomingFrame);
 
-// SENDER ULANDI
+// SENDER ULANDI - DARHOL JONLI OYNANI OCHISH
 socket.on('sender-connected', ({ deviceName }) => {
+    console.log("Telefon ulandi:", deviceName);
     if (connectedDeviceName) {
         connectedDeviceName.textContent = deviceName || "Android Telefon";
     }
+    // Kutish oynasini darhol yopish
+    if (qrWaitingPanel) qrWaitingPanel.style.display = 'none';
+    if (liveStreamPanel) liveStreamPanel.style.display = 'flex';
+    switchTab('receiver');
 });
 
-// SENDER UZILDI
+// EFIR UZILGANDA
 function onStreamDisconnected() {
     if (liveStreamPanel) liveStreamPanel.style.display = 'none';
     if (qrWaitingPanel) qrWaitingPanel.style.display = 'block';
@@ -119,7 +122,14 @@ socket.on('sender-disconnected', onStreamDisconnected);
 socket.on('stream-stopped', onStreamDisconnected);
 socket.on('room-closed', onStreamDisconnected);
 
-// 1. TIZIM MA'LUMOTLARINI OLISH
+// SOCKET BOG'LANGANDA HAR SAFAR XONAGA QAYTA QO'SHILISH
+socket.on('connect', () => {
+    console.log("Socket serverga ulandi:", socket.id);
+    socket.emit('join-as-receiver', { pin: currentRoomPin });
+    socket.emit('join-room', { roomId: currentRoomPin });
+});
+
+// TIZIM MA'LUMOTLARINI OLISH
 async function loadServerInfo() {
     try {
         const res = await fetch('/api/server-info');
@@ -130,7 +140,6 @@ async function loadServerInfo() {
             if (pcQrCodeImg && data.qrCode) pcQrCodeImg.src = data.qrCode;
             currentRoomPin = data.pin || "777888";
 
-            // Faqat qabul qiluvchi sifatida xonaga kirish
             socket.emit('join-as-receiver', { pin: currentRoomPin });
             socket.emit('join-room', { roomId: currentRoomPin });
         }
@@ -140,7 +149,7 @@ async function loadServerInfo() {
 }
 loadServerInfo();
 
-// 2. TABLARNI ALMASHTIRISH
+// TABLARNI ALMASHTIRISH
 function switchTab(view) {
     if (view === 'receiver') {
         tabReceiver.classList.add('active');
@@ -158,7 +167,7 @@ function switchTab(view) {
 tabReceiver.addEventListener('click', () => switchTab('receiver'));
 tabSender.addEventListener('click', () => switchTab('sender'));
 
-// 3. TO'LIQ EKRAN
+// TO'LIQ EKRAN
 btnToggleFull.addEventListener('click', () => {
     if (!document.fullscreenElement) {
         liveStreamPanel.requestFullscreen().catch(e => console.log(e));
@@ -167,7 +176,7 @@ btnToggleFull.addEventListener('click', () => {
     }
 });
 
-// 4. EKRANNI BURISH
+// EKRANNI BURISH
 btnRotateStream.addEventListener('click', () => {
     currentRotation = (currentRotation + 90) % 360;
     if (streamImg.src) {
@@ -175,13 +184,13 @@ btnRotateStream.addEventListener('click', () => {
     }
 });
 
-// 5. ULANISHNI UZISH
+// EFIRNI UZISH
 btnDisconnectStream.addEventListener('click', () => {
     socket.emit('stop-stream');
     onStreamDisconnected();
 });
 
-// 6. KOMPYUTER EKRANINI UZATISH (FAKAT TALAB ETILGANDA)
+// KOMPYUTER EKRANINI UZATISH (Ixtiyoriy)
 btnStartPcShare.addEventListener('click', async () => {
     const pin = (targetPinInput ? targetPinInput.value.trim() : '') || currentRoomPin;
 
@@ -215,10 +224,10 @@ btnStartPcShare.addEventListener('click', async () => {
         localScreenStream = stream;
         isCapturingDesktop = true;
 
-        socket.emit('join-as-sender', { pin: pin, deviceName: "Kompyuter (PC)" }, (res) => {
+        socket.emit('join-as-sender', { pin: pin, deviceName: "Kompyuter (PC)" }, () => {
             btnStartPcShare.style.display = 'none';
             btnStopPcShare.style.display = 'block';
-            senderCastStatus.textContent = "🟢 Kompyuteringiz ekrani uzatilmoqda. Ikkinchi qurilma ushbu PIN orqali ko'ra oladi.";
+            senderCastStatus.textContent = "🟢 Kompyuteringiz ekrani uzatilmoqda.";
 
             startDesktopCaptureLoop(stream);
         });

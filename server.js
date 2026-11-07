@@ -13,7 +13,7 @@ const UDP_PORT = 4847;
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: '*' },
-    maxHttpBufferSize: 1e8 // 100 MB max buffer for smooth high-res frames
+    maxHttpBufferSize: 1e8 // 100 MB max buffer for ultra-high-res frames
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -33,17 +33,9 @@ function getLocalIpAddress() {
 }
 
 const computerName = os.hostname() || "Kompyuter (PC)";
-
-// 6 xonali tasodifiy PIN yaratish
-function generateRoomPin() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Xonalar xaritasi: pin -> { hostId, clients, activeStreamer }
-const rooms = new Map();
-
-// Standart umumiy xona
 const DEFAULT_ROOM_PIN = "777888";
+
+const rooms = new Map();
 rooms.set(DEFAULT_ROOM_PIN, {
     pin: DEFAULT_ROOM_PIN,
     hostId: null,
@@ -52,21 +44,18 @@ rooms.set(DEFAULT_ROOM_PIN, {
 });
 
 io.on('connection', (socket) => {
-    console.log(`[ULANISH] Yangi mijoz: ${socket.id}`);
+    console.log(`[ULANISH] Yangi mijoz bog'landi: ${socket.id}`);
+
+    // Avtomatik ravishda standart xonaga ulab qo'yish
+    socket.join(DEFAULT_ROOM_PIN);
+    socket.roomPin = DEFAULT_ROOM_PIN;
 
     // 1. Yangi Qabul qiluvchi (Receiver) xona ochish
     socket.on('create-receiver-room', async (callback) => {
-        const pin = generateRoomPin();
+        const pin = DEFAULT_ROOM_PIN;
         socket.join(pin);
         socket.roomPin = pin;
         socket.role = 'receiver';
-
-        rooms.set(pin, {
-            pin: pin,
-            hostId: socket.id,
-            clients: [],
-            activeStreamer: null
-        });
 
         const currentIp = getLocalIpAddress();
         const qrPayload = JSON.stringify({
@@ -93,34 +82,22 @@ io.on('connection', (socket) => {
                 callback({ success: false, message: err.message });
             }
         }
-        console.log(`[XONA YARATILDI] PIN: ${pin} | Host: ${socket.id}`);
     });
 
-    // 2. Uzatuvchi (Sender) xonaga ulanishi (PIN orqali)
+    // 2. Uzatuvchi (Sender) xonaga ulanishi
     socket.on('join-as-sender', ({ pin, deviceName }, callback) => {
         const targetPin = pin || DEFAULT_ROOM_PIN;
-        let room = rooms.get(targetPin);
-        if (!room) {
-            // Agar xona topilmasa, avtomatik yaratamiz
-            room = {
-                pin: targetPin,
-                hostId: null,
-                clients: [],
-                activeStreamer: socket.id
-            };
-            rooms.set(targetPin, room);
-        }
-
         socket.join(targetPin);
         socket.roomPin = targetPin;
         socket.role = 'sender';
-        socket.deviceName = deviceName || 'Qurilma';
+        socket.deviceName = deviceName || 'Android Telefon';
 
-        room.clients.push(socket.id);
-        room.activeStreamer = socket.id;
-
-        // Xonadagi barcha qabul qiluvchilarga sender ulangani haqida xabar berish
+        // Qabul qiluvchilarga sender ulangani haqida darhol xabar berish
         socket.to(targetPin).emit('sender-connected', {
+            senderId: socket.id,
+            deviceName: socket.deviceName
+        });
+        socket.broadcast.emit('sender-connected', {
             senderId: socket.id,
             deviceName: socket.deviceName
         });
@@ -128,109 +105,74 @@ io.on('connection', (socket) => {
         if (typeof callback === 'function') {
             callback({ success: true, pin: targetPin });
         }
-        console.log(`[SENDER ULANDI] PIN: ${targetPin} | Qurilma: ${socket.deviceName}`);
+        console.log(`[SENDER ULANDI] Qurilma: ${socket.deviceName} | PIN: ${targetPin}`);
     });
 
-    // Qabul qiluvchi sifatida mavjud xonaga qo'shilish
+    // Qabul qiluvchi sifatida qo'shilish
     socket.on('join-as-receiver', ({ pin }, callback) => {
         const targetPin = pin || DEFAULT_ROOM_PIN;
         socket.join(targetPin);
         socket.roomPin = targetPin;
         socket.role = 'receiver';
 
-        if (!rooms.has(targetPin)) {
-            rooms.set(targetPin, {
-                pin: targetPin,
-                hostId: socket.id,
-                clients: [],
-                activeStreamer: null
-            });
-        }
-
         if (typeof callback === 'function') {
             callback({ success: true, pin: targetPin });
         }
-        console.log(`[RECEIVER ULANDI] PIN: ${targetPin}`);
+        console.log(`[RECEIVER TAYYOR] Socket: ${socket.id} | PIN: ${targetPin}`);
     });
 
-    // Eski mijozlar uchun moslik (Backward compatibility)
+    // Legacy mijozlar
     socket.on('join-room', (data) => {
         const roomId = (typeof data === 'string' ? data : data?.roomId) || DEFAULT_ROOM_PIN;
         socket.join(roomId);
         socket.roomPin = roomId;
         socket.role = 'sender';
-        socket.deviceName = (typeof data === 'object' && data?.deviceName) || 'Mobil Qurilma';
-
-        let room = rooms.get(roomId);
-        if (!room) {
-            room = { pin: roomId, hostId: null, clients: [socket.id], activeStreamer: socket.id };
-            rooms.set(roomId, room);
-        } else {
-            room.clients.push(socket.id);
-            room.activeStreamer = socket.id;
-        }
+        socket.deviceName = (typeof data === 'object' && data?.deviceName) || 'Mobil Telefon';
 
         socket.to(roomId).emit('sender-connected', {
             senderId: socket.id,
             deviceName: socket.deviceName
         });
-        console.log(`[LEGACY JOIN] Room: ${roomId} | Qurilma: ${socket.deviceName}`);
+        socket.broadcast.emit('sender-connected', {
+            senderId: socket.id,
+            deviceName: socket.deviceName
+        });
     });
 
-    // 3. Ekran kadrlari (JPEG Frame Streaming)
-    const handleIncomingFrame = (frameBuffer) => {
+    // 3. Ekran kadrlari (JPEG Frame Streaming) - Xonaga va barcha qabul qiluvchilarga tarqatish
+    const handleIncomingFrame = (frameData) => {
         const pin = socket.roomPin || DEFAULT_ROOM_PIN;
-        socket.to(pin).emit('incoming-screen-frame', frameBuffer);
-        socket.to(pin).emit('mobile-frame', frameBuffer); // legacy
+        // Xonaga tarqatish
+        socket.to(pin).emit('incoming-screen-frame', frameData);
+        // Umumiy tarqatish (senderdan tashqari barcha bog'langan monitorlarga)
+        socket.broadcast.emit('incoming-screen-frame', frameData);
+        socket.broadcast.emit('mobile-frame', frameData);
     };
 
     socket.on('screen-frame', handleIncomingFrame);
     socket.on('mobile-frame', handleIncomingFrame);
 
-    // 4. WebRTC Signallar
-    socket.on('webrtc-offer', (payload) => {
-        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
-        socket.to(pin).emit('webrtc-offer', payload);
-    });
-
-    socket.on('webrtc-answer', (payload) => {
-        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
-        socket.to(pin).emit('webrtc-answer', payload);
-    });
-
-    socket.on('webrtc-ice-candidate', (payload) => {
-        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
-        socket.to(pin).emit('webrtc-ice-candidate', payload);
-    });
-
-    // 5. Efirni to'xtatish
+    // 4. Efirni to'xtatish
     const handleStopStream = () => {
         const pin = socket.roomPin || DEFAULT_ROOM_PIN;
         io.to(pin).emit('stream-stopped');
+        socket.broadcast.emit('stream-stopped');
         console.log(`[EFIR TO'XTATILDI] PIN: ${pin}`);
     };
 
     socket.on('stop-stream', handleStopStream);
     socket.on('stop-streaming', handleStopStream);
 
-    // 6. Ulanish uzilganda
+    // 5. Ulanish uzilganda
     socket.on('disconnect', () => {
-        const pin = socket.roomPin;
-        if (pin && rooms.has(pin)) {
-            const room = rooms.get(pin);
-            if (room.hostId === socket.id) {
-                io.to(pin).emit('room-closed');
-                rooms.delete(pin);
-                console.log(`[XONA YOPILDI] PIN: ${pin}`);
-            } else {
-                io.to(pin).emit('sender-disconnected');
-            }
-        }
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('sender-disconnected');
+        socket.broadcast.emit('sender-disconnected');
         console.log(`[CHIYISH] Mijoz uzildi: ${socket.id}`);
     });
 });
 
-// Ma'lumot olish API (Ikkala manzilni ham qo'llab-quvvatlaydi)
+// Server info API
 const handleInfoRequest = async (req, res) => {
     try {
         const currentIp = getLocalIpAddress();
@@ -260,17 +202,11 @@ const handleInfoRequest = async (req, res) => {
 app.get('/api/info', handleInfoRequest);
 app.get('/api/server-info', handleInfoRequest);
 
-// UDP Broadcast Beacon (Wi-Fi router ruxsat bersa, fon rejimida signallarni yuborib turadi)
+// UDP Beacon
 try {
     const udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    udpSocket.on('error', (err) => {
-        // Router UDP broadcastni bloklasa xato bermaydi
-    });
-
     udpSocket.bind(() => {
-        try {
-            udpSocket.setBroadcast(true);
-        } catch (e) {}
+        try { udpSocket.setBroadcast(true); } catch (e) {}
     });
 
     setInterval(() => {
