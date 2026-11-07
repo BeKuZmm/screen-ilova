@@ -109,34 +109,52 @@ io.on('connection', (socket) => {
     });
 
     // Qabul qiluvchi sifatida qo'shilish
-    socket.on('join-as-receiver', ({ pin }, callback) => {
-        const targetPin = pin || DEFAULT_ROOM_PIN;
+    socket.on('join-as-receiver', (data, callback) => {
+        const targetPin = (typeof data === 'string' ? data : data?.pin || data?.roomId) || DEFAULT_ROOM_PIN;
+        const deviceName = (typeof data === 'object' && data?.deviceName) || 'Mobil Telefon (Qabul qiluvchi)';
         socket.join(targetPin);
         socket.roomPin = targetPin;
         socket.role = 'receiver';
+        socket.deviceName = deviceName;
+
+        // Xonadagi senderga qabul qiluvchi ulandi deb xabar berish
+        socket.to(targetPin).emit('receiver-connected', {
+            receiverId: socket.id,
+            deviceName: socket.deviceName
+        });
 
         if (typeof callback === 'function') {
             callback({ success: true, pin: targetPin });
         }
-        console.log(`[RECEIVER TAYYOR] Socket: ${socket.id} | PIN: ${targetPin}`);
+        console.log(`[RECEIVER TAYYOR] Socket: ${socket.id} | Qurilma: ${deviceName} | PIN: ${targetPin}`);
     });
 
-    // Legacy mijozlar
+    // Legacy / Umumiy ulanish
     socket.on('join-room', (data) => {
-        const roomId = (typeof data === 'string' ? data : data?.roomId) || DEFAULT_ROOM_PIN;
+        const roomId = (typeof data === 'string' ? data : data?.roomId || data?.pin) || DEFAULT_ROOM_PIN;
+        const role = (typeof data === 'object' && data?.role) || 'sender';
         socket.join(roomId);
         socket.roomPin = roomId;
-        socket.role = 'sender';
-        socket.deviceName = (typeof data === 'object' && data?.deviceName) || 'Mobil Telefon';
+        socket.role = role;
+        socket.deviceName = (typeof data === 'object' && data?.deviceName) || (role === 'receiver' ? 'Qabul qiluvchi qurilma' : 'Mobil Telefon');
 
-        socket.to(roomId).emit('sender-connected', {
-            senderId: socket.id,
-            deviceName: socket.deviceName
-        });
-        socket.broadcast.emit('sender-connected', {
-            senderId: socket.id,
-            deviceName: socket.deviceName
-        });
+        if (role === 'sender') {
+            socket.to(roomId).emit('sender-connected', {
+                senderId: socket.id,
+                deviceName: socket.deviceName
+            });
+            socket.broadcast.emit('sender-connected', {
+                senderId: socket.id,
+                deviceName: socket.deviceName
+            });
+            console.log(`[SENDER ULANDI via join-room] Socket: ${socket.id} | PIN: ${roomId}`);
+        } else {
+            socket.to(roomId).emit('receiver-connected', {
+                receiverId: socket.id,
+                deviceName: socket.deviceName
+            });
+            console.log(`[RECEIVER ULANDI via join-room] Socket: ${socket.id} | PIN: ${roomId}`);
+        }
     });
 
     // 3. Ekran kadrlari (JPEG Frame Streaming) - Xonaga va barcha qabul qiluvchilarga tarqatish

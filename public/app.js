@@ -48,6 +48,7 @@ let frameCount = 0;
 let lastFpsTime = performance.now();
 
 // KADRNI CHIZISH (JPEG KADRLAR UCHUN)
+let currentActiveTab = 'receiver';
 const streamImg = new Image();
 streamImg.onload = () => {
     if (!screenCanvas || !canvasCtx) return;
@@ -82,7 +83,7 @@ streamImg.onload = () => {
 let activeBlobUrl = null;
 
 function renderIncomingFrame(data) {
-    if (isCapturingDesktop) return;
+    if (isCapturingDesktop || currentActiveTab === 'sender') return;
 
     if (qrWaitingPanel && qrWaitingPanel.style.display !== 'none') {
         qrWaitingPanel.style.display = 'none';
@@ -152,7 +153,7 @@ socket.on('audio-frame', (arrayBuffer) => {
 
 // WEBRTC SIGNALING: TELEFONDAN KELGAN WEBRTC OFFER
 socket.on('webrtc-offer', async ({ senderId, offer }) => {
-    if (isCapturingDesktop) return;
+    if (isCapturingDesktop || currentActiveTab === 'sender') return;
     console.log("[WebRTC] Telefondan Offer qabul qilindi");
 
     try {
@@ -162,6 +163,7 @@ socket.on('webrtc-offer', async ({ senderId, offer }) => {
         peerConnection = new RTCPeerConnection(rtcConfig);
 
         peerConnection.ontrack = (event) => {
+            if (isCapturingDesktop || currentActiveTab === 'sender') return;
             console.log("[WebRTC] Trek qabul qilindi:", event.track.kind);
             const stream = event.streams[0] || new MediaStream([event.track]);
             if (liveWebRtcVideo) {
@@ -217,12 +219,24 @@ socket.on('webrtc-ice-candidate', async ({ candidate }) => {
 // SENDER ULANDI
 socket.on('sender-connected', ({ deviceName }) => {
     console.log("Qurilma ulandi:", deviceName);
+    if (isCapturingDesktop || currentActiveTab === 'sender') {
+        console.log("[Sender rejimi] Kompyuter uzatish rejimida, receiver oynasiga avtomatik o'tish bloklandi");
+        return;
+    }
     if (connectedDeviceName) {
         connectedDeviceName.textContent = deviceName || "Android Telefon";
     }
     if (qrWaitingPanel) qrWaitingPanel.style.display = 'none';
     if (liveStreamPanel) liveStreamPanel.style.display = 'flex';
     switchTab('receiver');
+});
+
+// RECEIVER (TOMOSHABIN TELEFON) ULANDI
+socket.on('receiver-connected', ({ deviceName }) => {
+    console.log("Qabul qiluvchi telefon ulandi:", deviceName);
+    if (senderCastStatus && (isCapturingDesktop || currentActiveTab === 'sender')) {
+        senderCastStatus.textContent = `🟢 ${deviceName || 'Telefon'} ulandi! Kompyuter ekrani jonli uzatilmoqda.`;
+    }
 });
 
 // EFIR UZILGANDA
@@ -275,6 +289,7 @@ async function loadServerInfo() {
 loadServerInfo();
 
 function switchTab(view) {
+    currentActiveTab = view;
     if (view === 'receiver') {
         tabReceiver.classList.add('active');
         tabSender.classList.remove('active');

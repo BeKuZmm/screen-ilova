@@ -432,9 +432,10 @@ class MainActivity : AppCompatActivity() {
                 val joinData = JSONObject().apply {
                     put("pin", pin)
                     put("roomId", pin)
+                    put("role", "receiver")
+                    put("deviceName", "Mobil Telefon")
                 }
                 receiverSocket?.emit("join-as-receiver", joinData)
-                receiverSocket?.emit("join-room", joinData)
             }
 
             // Kompyuterdan kelgan audio kadrlarini ijro etish
