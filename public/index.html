@@ -2,144 +2,157 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Screen Share Pro — Universal Mirroring</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScreenShare Pro — Professional Screen Mirroring</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- HEADER -->
-        <header class="header">
-            <div class="logo">
-                <i class="fa-solid fa-display-arrow-down"></i>
-                <span>Screen<b>Share</b> Pro</span>
+    <div class="app-layout">
+        <!-- TOP HEADER -->
+        <header class="app-header">
+            <div class="brand">
+                <i class="fa-solid fa-satellite-dish brand-icon"></i>
+                <span class="brand-name">ScreenShare <span class="badge-pro">PRO</span></span>
             </div>
-            <div class="header-right">
-                <div class="badge-status" id="connectionStatus">
-                    <span class="status-dot"></span> <span id="statusText">Ulanmagan</span>
+            <div class="header-actions">
+                <div class="status-indicator" id="headerStatus">
+                    <span class="status-dot"></span> <span id="headerStatusText">Tayyor</span>
                 </div>
-                <button class="btn-pro" id="openProModalBtn">
-                    <i class="fa-solid fa-crown"></i> <span id="proBtnText">PRO Kalit</span>
+                <button class="btn-ghost" id="btnBackToHome" style="display:none;">
+                    <i class="fa-solid fa-house"></i> Bosh sahifa
                 </button>
             </div>
         </header>
 
-        <!-- MAIN LAYOUT -->
-        <main class="main-content">
-            <!-- LEFT / CONTROL PANEL -->
-            <section class="sidebar">
-                <!-- Qurilma ma'lumoti -->
-                <div class="card device-info-card">
-                    <h3><i class="fa-solid fa-network-wired"></i> Lokal Tarmoq (LAN/Wi-Fi)</h3>
-                    <p class="text-muted">Telefon yoki televizordan ushbu manzilga kiring:</p>
-                    <div class="url-box" id="serverUrlBox">Yuklanmoqda...</div>
-                    <div class="qr-container">
-                        <img id="qrCodeImg" src="" alt="QR Kod">
-                        <span class="text-hint">Kamerani yaqinlashtiring</span>
-                    </div>
+        <!-- MAIN CONTAINER -->
+        <main class="app-main">
+            <!-- 1. ASOSIY REJIM TANLASH OYNASI -->
+            <section class="view-panel" id="viewModeSelection">
+                <div class="text-center section-title-wrap">
+                    <h1 class="hero-title">Qanday ulanmoqchisiz?</h1>
+                    <p class="hero-subtitle">Kerakli rejimni tanlang:</p>
                 </div>
 
-                <!-- Xona va Ulanish -->
-                <div class="card room-card">
-                    <h3><i class="fa-solid fa-door-open"></i> Xonaga ulanish</h3>
-                    <div class="input-group">
-                        <label>Sizning qurilmangiz:</label>
-                        <select id="deviceTypeSelect">
-                            <option value="pc">💻 Kompyuter (PC)</option>
-                            <option value="phone">📱 Telefon (Mobile)</option>
-                            <option value="tv">📺 Televizor (Smart TV)</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>Xona PIN kodi:</label>
-                        <div class="room-pin-wrap">
-                            <input type="text" id="roomIdInput" value="777888" maxlength="8">
-                            <button class="btn-small" id="generatePinBtn" title="Yangi PIN"><i class="fa-solid fa-arrows-rotate"></i></button>
+                <div class="modes-grid">
+                    <!-- REJIM 1: QABUL QILISH -->
+                    <div class="mode-card" id="cardSelectReceive">
+                        <div class="mode-icon-wrap icon-receive">
+                            <i class="fa-solid fa-display"></i>
+                            <i class="fa-solid fa-arrow-down mode-badge-icon"></i>
                         </div>
+                        <h2>Ekranni Qabul Qilish</h2>
+                        <p>Telefon yoki ikkinchi kompyuter ekranini ushbu monitorga chiqarish</p>
+                        <div class="mode-meta">
+                            <span><i class="fa-solid fa-qrcode"></i> QR-kod va PIN orqali</span>
+                        </div>
+                        <button class="btn-mode btn-mode-receive">
+                            Qabul qilishni boshlash <i class="fa-solid fa-chevron-right"></i>
+                        </button>
                     </div>
-                    <button class="btn-primary" id="joinRoomBtn">
-                        <i class="fa-solid fa-plug"></i> Xonaga qo'shilish
-                    </button>
-                </div>
 
-                <!-- Ulangan Qurilmalar -->
-                <div class="card devices-card">
-                    <h3><i class="fa-solid fa-users"></i> Ulangan qurilmalar (<span id="deviceCount">0</span>)</h3>
-                    <ul class="device-list" id="deviceList">
-                        <li class="empty-list">Hozircha xonada hech kim yo'q</li>
-                    </ul>
+                    <!-- REJIM 2: UZATISH -->
+                    <div class="mode-card" id="cardSelectSend">
+                        <div class="mode-icon-wrap icon-send">
+                            <i class="fa-solid fa-mobile-screen"></i>
+                            <i class="fa-solid fa-arrow-up mode-badge-icon"></i>
+                        </div>
+                        <h2>Ekranni Uzatish</h2>
+                        <p>Ushbu kompyuter ekranini telefon, televizor yoki boshqa kompyuterga uzatish</p>
+                        <div class="mode-meta">
+                            <span><i class="fa-solid fa-bolt"></i> 60 FPS Ultra-HD</span>
+                        </div>
+                        <button class="btn-mode btn-mode-send">
+                            Ekranni uzatish <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
                 </div>
             </section>
 
-            <!-- RIGHT / VIDEO STREAM AREA -->
-            <section class="viewport-area">
-                <!-- Toolbar / Boshqaruv tugmalari -->
-                <div class="stream-toolbar">
-                    <button class="btn-action" id="startShareBtn" disabled>
-                        <i class="fa-solid fa-arrow-up-from-bracket"></i> Ekranni uzatish
-                    </button>
-                    <button class="btn-action btn-danger" id="stopShareBtn" style="display: none;">
-                        <i class="fa-solid fa-circle-stop"></i> Uzatishni to'xtatish
-                    </button>
-                    
-                    <!-- Taymer / Status -->
-                    <div class="timer-badge" id="sessionTimerBadge">
-                        <i class="fa-solid fa-clock"></i> <span id="timerDisplay">10:00 (Free)</span>
+            <!-- 2. QABUL QILUVCHI OYNA (RECEIVER VIEW) -->
+            <section class="view-panel" id="viewReceiver" style="display: none;">
+                <!-- QR & PIN Waiting Box -->
+                <div class="receiver-waiting-box" id="receiverWaitingBox">
+                    <div class="waiting-header">
+                        <h2>Ikkinchi qurilmani ulang</h2>
+                        <p>Telefoningizdan ushbu QR-kodni skaner qiling yoki 6 xonali PIN kodni kiriting:</p>
                     </div>
 
-                    <button class="btn-icon" id="fullscreenBtn" title="To'liq ekran">
-                        <i class="fa-solid fa-expand"></i>
-                    </button>
+                    <div class="qr-code-wrapper">
+                        <img id="receiverQrImg" src="" alt="QR Kod">
+                        <div class="qr-scan-hint"><i class="fa-solid fa-camera"></i> Kamerani yaqinlashtiring</div>
+                    </div>
+
+                    <div class="pin-display-wrapper">
+                        <span class="pin-label">XONA PIN KODI:</span>
+                        <div class="pin-code-badge" id="receiverPinDisplay">------</div>
+                    </div>
+
+                    <div class="network-hint-box">
+                        <i class="fa-solid fa-network-wired"></i>
+                        <span id="receiverUrlDisplay">http://...</span>
+                    </div>
+
+                    <div class="waiting-pulse">
+                        <span class="pulse-dot"></span> Ulanish kutilmoqda...
+                    </div>
                 </div>
 
-                <!-- Video Konteyner -->
-                <div class="video-container" id="videoContainer">
-                    <video id="remoteVideo" autoplay playsinline muted></video>
-                    <canvas id="mobileCanvas" style="display:none; width:100%; height:100%; object-fit:contain;"></canvas>
-                    
-                    <!-- Bo'sh turgandagi plakat -->
-                    <div class="empty-state" id="emptyVideoState">
-                        <i class="fa-solid fa-tower-broadcast"></i>
-                        <h3>Ekran uzatish kutilmoqda</h3>
-                        <p>Xonaga qo'shiling va "Ekranni uzatish" tugmasini bosing</p>
+                <!-- Live Stream Viewer Container -->
+                <div class="stream-viewer-box" id="streamViewerBox" style="display: none;">
+                    <div class="stream-top-bar">
+                        <div class="stream-device-info">
+                            <i class="fa-solid fa-circle-play text-green"></i>
+                            <span>Efirda: <b id="streamSenderName">Qurilma</b></span>
+                        </div>
+                        <div class="stream-actions">
+                            <button class="btn-icon" id="btnToggleFullscreen" title="To'liq ekran">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                            <button class="btn-icon btn-danger" id="btnCloseStream" title="Efirni yopish">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Suv belgisi (Watermark) -->
-                    <div class="watermark" id="appWatermark">
-                        <span>ScreenShare Pro (Free Version)</span>
+                    <div class="canvas-render-area" id="renderArea">
+                        <canvas id="liveScreenCanvas"></canvas>
+                        <video id="liveWebRtcVideo" autoplay playsinline muted style="display:none;"></video>
                     </div>
+                </div>
+            </section>
+
+            <!-- 3. UZATUVCHI OYNA (SENDER VIEW) -->
+            <section class="view-panel" id="viewSender" style="display: none;">
+                <div class="sender-box">
+                    <div class="sender-header">
+                        <h2>Qabul qiluvchi qurilmaga ulanish</h2>
+                        <p>Televizor, telefon yoki boshqa kompyuter ekranida chiqqan 6 xonali PIN kodni kiriting:</p>
+                    </div>
+
+                    <div class="pin-input-group">
+                        <label for="inputSenderPin">6 xonali PIN kod:</label>
+                        <input type="text" id="inputSenderPin" placeholder="Masalan: 123456" maxlength="6" inputmode="numeric">
+                    </div>
+
+                    <div class="pin-input-group">
+                        <label for="inputTargetIp">Qabul qiluvchi IP manzili (agar boshqa tarmoqda bo'lsa):</label>
+                        <input type="text" id="inputTargetIp" placeholder="Masalan: 192.168.1.100:4848">
+                    </div>
+
+                    <div class="sender-action-btns">
+                        <button class="btn-primary-large" id="btnStartPcCast">
+                            <i class="fa-solid fa-arrow-up-from-bracket"></i> Ekranni tanlash va uzatish
+                        </button>
+                        <button class="btn-danger-large" id="btnStopPcCast" style="display: none;">
+                            <i class="fa-solid fa-circle-stop"></i> Uzatishni to'xtatish
+                        </button>
+                    </div>
+
+                    <div class="stream-status-msg" id="senderStatusMsg"></div>
                 </div>
             </section>
         </main>
-    </div>
-
-    <!-- PRO / MASTER KOD MODAL OYNASI -->
-    <div class="modal-overlay" id="proModal">
-        <div class="modal-content">
-            <button class="close-modal-btn" id="closeProModalBtn">&times;</button>
-            <div class="modal-header">
-                <i class="fa-solid fa-crown pro-icon"></i>
-                <h2>PRO Litsenziya / Master Kod</h2>
-            </div>
-            <div class="modal-body">
-                <p>PRO rejimda quyidagi cheklovlar to'liq olinadi:</p>
-                <ul class="pro-features">
-                    <li><i class="fa-solid fa-check"></i> Cheksiz ulanish vaqti (Taymersiz)</li>
-                    <li><i class="fa-solid fa-check"></i> 1080p / 4K Ultra-HD va 60 FPS</li>
-                    <li><i class="fa-solid fa-check"></i> Suv belgisi (Watermark) butunlay yo'qoladi</li>
-                    <li><i class="fa-solid fa-check"></i> Wi-Fi Hotspot & Bluetooth tezkor ulanish</li>
-                </ul>
-                <div class="input-group">
-                    <label>Master PRO Kodni kiriting:</label>
-                    <input type="text" id="proCodeInput" placeholder="Masalan: SCREEN-PRO-7777">
-                </div>
-                <div id="proMessage" class="modal-message"></div>
-                <button class="btn-primary btn-pro-submit" id="submitProCodeBtn">
-                    Faollashtirish
-                </button>
-            </div>
-        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

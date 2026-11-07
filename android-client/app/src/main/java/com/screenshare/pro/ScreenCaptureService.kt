@@ -41,6 +41,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_RESULT_CODE = "RESULT_CODE"
         const val EXTRA_RESULT_DATA = "RESULT_DATA"
         const val EXTRA_SERVER_IP = "SERVER_IP"
+        const val EXTRA_SERVER_PORT = "SERVER_PORT"
         const val EXTRA_ROOM_PIN = "ROOM_PIN"
     }
 
@@ -52,6 +53,7 @@ class ScreenCaptureService : Service() {
             .setContentTitle("ScreenShare Pro")
             .setContentText("Telefon ekrani kompyuterga uzatilmoqda...")
             .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setOngoing(true)
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
@@ -59,10 +61,11 @@ class ScreenCaptureService : Service() {
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
         val resultData = intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
         val serverIp = intent?.getStringExtra(EXTRA_SERVER_IP) ?: ""
+        val serverPort = intent?.getIntExtra(EXTRA_SERVER_PORT, 4848) ?: 4848
         val roomPin = intent?.getStringExtra(EXTRA_ROOM_PIN) ?: "777888"
 
         if (resultCode != 0 && resultData != null && serverIp.isNotEmpty()) {
-            connectSocketAndStartStreaming(resultCode, resultData, serverIp, roomPin)
+            connectSocketAndStartStreaming(resultCode, resultData, serverIp, serverPort, roomPin)
         }
 
         return START_NOT_STICKY
@@ -72,29 +75,29 @@ class ScreenCaptureService : Service() {
         resultCode: Int,
         resultData: Intent,
         serverIp: String,
+        serverPort: Int,
         roomPin: String
     ) {
         streamJob = CoroutineScope(Dispatchers.IO).launch {
             try {
                 val opts = IO.Options().apply {
                     reconnection = true
-                    timeout = 5000
+                    timeout = 6000
                 }
-                socket = IO.socket("http://$serverIp:4848", opts)
+                val socketUrl = "http://$serverIp:$serverPort"
+                socket = IO.socket(socketUrl, opts)
                 socket?.connect()
 
                 socket?.on(Socket.EVENT_CONNECT) {
                     val joinData = JSONObject().apply {
+                        put("pin", roomPin)
                         put("roomId", roomPin)
                         put("deviceName", Build.MODEL ?: "Android Telefon")
-                        put("deviceType", "phone")
-                        put("isPro", true)
                     }
+                    socket?.emit("join-as-sender", joinData)
                     socket?.emit("join-room", joinData)
-                    socket?.emit("start-streaming")
                 }
 
-                // MediaProjection sozlash
                 val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
 
@@ -151,10 +154,11 @@ class ScreenCaptureService : Service() {
                         }
 
                         val baos = ByteArrayOutputStream()
-                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 65, baos)
                         val jpegBytes = baos.toByteArray()
 
                         if (socket?.connected() == true) {
+                            socket?.emit("screen-frame", jpegBytes)
                             socket?.emit("mobile-frame", jpegBytes)
                         }
 
@@ -179,6 +183,7 @@ class ScreenCaptureService : Service() {
         virtualDisplay?.release()
         imageReader?.close()
         mediaProjection?.stop()
+        socket?.emit("stop-stream")
         socket?.emit("stop-streaming")
         socket?.disconnect()
     }

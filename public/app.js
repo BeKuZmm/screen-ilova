@@ -1,201 +1,162 @@
 // DOM ELEMENTLAR
-const serverUrlBox = document.getElementById('serverUrlBox');
-const qrCodeImg = document.getElementById('qrCodeImg');
-const connectionStatus = document.getElementById('connectionStatus');
-const statusText = document.getElementById('statusText');
-const deviceTypeSelect = document.getElementById('deviceTypeSelect');
-const roomIdInput = document.getElementById('roomIdInput');
-const generatePinBtn = document.getElementById('generatePinBtn');
-const joinRoomBtn = document.getElementById('joinRoomBtn');
-const deviceList = document.getElementById('deviceList');
-const deviceCount = document.getElementById('deviceCount');
+const headerStatus = document.getElementById('headerStatus');
+const headerStatusText = document.getElementById('headerStatusText');
+const btnBackToHome = document.getElementById('btnBackToHome');
 
-const startShareBtn = document.getElementById('startShareBtn');
-const stopShareBtn = document.getElementById('stopShareBtn');
-const sessionTimerBadge = document.getElementById('sessionTimerBadge');
-const timerDisplay = document.getElementById('timerDisplay');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
-const remoteVideo = document.getElementById('remoteVideo');
-const mobileCanvas = document.getElementById('mobileCanvas');
-const mobileCtx = mobileCanvas ? mobileCanvas.getContext('2d') : null;
-const emptyVideoState = document.getElementById('emptyVideoState');
-const appWatermark = document.getElementById('appWatermark');
+// VIEWS
+const viewModeSelection = document.getElementById('viewModeSelection');
+const viewReceiver = document.getElementById('viewReceiver');
+const viewSender = document.getElementById('viewSender');
 
-// PRO MODAL
-const proModal = document.getElementById('proModal');
-const openProModalBtn = document.getElementById('openProModalBtn');
-const closeProModalBtn = document.getElementById('closeProModalBtn');
-const proCodeInput = document.getElementById('proCodeInput');
-const submitProCodeBtn = document.getElementById('submitProCodeBtn');
-const proMessage = document.getElementById('proMessage');
-const proBtnText = document.getElementById('proBtnText');
+// MODE SELECTION BUTTONS
+const cardSelectReceive = document.getElementById('cardSelectReceive');
+const cardSelectSend = document.getElementById('cardSelectSend');
 
-// HOLATLAR (STATE)
-const socket = io(); // DARHOL ULASH
-let localStream = null;
-let peerConnections = {}; // targetId -> RTCPeerConnection
-let currentRoomId = null;
-let isStreaming = false;
-let isProUser = localStorage.getItem('screen_share_pro') === 'true';
+// RECEIVER VIEW ELEMENTS
+const receiverWaitingBox = document.getElementById('receiverWaitingBox');
+const receiverQrImg = document.getElementById('receiverQrImg');
+const receiverPinDisplay = document.getElementById('receiverPinDisplay');
+const receiverUrlDisplay = document.getElementById('receiverUrlDisplay');
+const streamViewerBox = document.getElementById('streamViewerBox');
+const streamSenderName = document.getElementById('streamSenderName');
+const btnToggleFullscreen = document.getElementById('btnToggleFullscreen');
+const btnCloseStream = document.getElementById('btnCloseStream');
+const liveScreenCanvas = document.getElementById('liveScreenCanvas');
+const canvasCtx = liveScreenCanvas ? liveScreenCanvas.getContext('2d') : null;
 
-// Mobil kadrlarni chizish
-const mobileImg = new Image();
-mobileImg.onload = () => {
-    if (mobileCanvas && mobileCtx) {
-        mobileCanvas.width = mobileImg.width;
-        mobileCanvas.height = mobileImg.height;
-        mobileCtx.drawImage(mobileImg, 0, 0);
+// SENDER VIEW ELEMENTS
+const inputSenderPin = document.getElementById('inputSenderPin');
+const inputTargetIp = document.getElementById('inputTargetIp');
+const btnStartPcCast = document.getElementById('btnStartPcCast');
+const btnStopPcCast = document.getElementById('btnStopPcCast');
+const senderStatusMsg = document.getElementById('senderStatusMsg');
+
+// STATE
+const socket = io();
+let currentMode = 'home'; // home, receiver, sender
+let activeRoomPin = "777888";
+let localMediaStream = null;
+let streamInterval = null;
+
+// KADRLARNI CHIZISH UCHUN RASM
+const frameImg = new Image();
+frameImg.onload = () => {
+    if (liveScreenCanvas && canvasCtx) {
+        liveScreenCanvas.width = frameImg.width;
+        liveScreenCanvas.height = frameImg.height;
+        canvasCtx.drawImage(frameImg, 0, 0);
     }
 };
 
-let previousBlobUrl = null;
-socket.on('mobile-frame', (arrayBuffer) => {
-    if (previousBlobUrl) URL.revokeObjectURL(previousBlobUrl);
+let currentBlobUrl = null;
+function renderFrame(arrayBuffer) {
+    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
-    previousBlobUrl = URL.createObjectURL(blob);
-    mobileImg.src = previousBlobUrl;
+    currentBlobUrl = URL.createObjectURL(blob);
+    frameImg.src = currentBlobUrl;
 
-    remoteVideo.style.display = 'none';
-    if (mobileCanvas) mobileCanvas.style.display = 'block';
-    emptyVideoState.style.display = 'none';
+    // Skaner kutish oynasini yopib, jonli stream oynasini ko'rsatish
+    if (receiverWaitingBox) receiverWaitingBox.style.display = 'none';
+    if (streamViewerBox) streamViewerBox.style.display = 'flex';
+}
+
+socket.on('incoming-screen-frame', renderFrame);
+socket.on('mobile-frame', renderFrame);
+
+// SENDER ULANDI
+socket.on('sender-connected', ({ deviceName }) => {
+    if (streamSenderName) streamSenderName.textContent = deviceName || "Mobil Qurilma";
+    headerStatus.querySelector('.status-dot').classList.add('active');
+    headerStatusText.textContent = "Ulandi: " + (deviceName || "Mobil Qurilma");
 });
 
-// LIMITLAR
-const FREE_TIME_LIMIT_SEC = 10 * 60; // 10 daqiqa
-let remainingSeconds = FREE_TIME_LIMIT_SEC;
-let timerInterval = null;
+// SENDER CHIQIB KETDI
+socket.on('sender-disconnected', () => {
+    if (receiverWaitingBox) receiverWaitingBox.style.display = 'flex';
+    if (streamViewerBox) streamViewerBox.style.display = 'none';
+    headerStatusText.textContent = "Ulanish kutilmoqda...";
+});
 
-function getDeviceName() {
-    const ua = navigator.userAgent;
-    if (/android/i.test(ua)) return 'Android Telefon';
-    if (/iPad|iPhone|iPod/.test(ua)) return 'iOS Qurilma';
-    if (/smart-tv|googletv|appletv|tizen/i.test(ua)) return 'Smart TV';
-    return 'Kompyuter (PC)';
+socket.on('stream-stopped', () => {
+    if (receiverWaitingBox) receiverWaitingBox.style.display = 'flex';
+    if (streamViewerBox) streamViewerBox.style.display = 'none';
+});
+
+// 1. REJIMLARNI ALMASHTIRISH (VIEW SWITCHER)
+function showView(viewName) {
+    currentMode = viewName;
+    if (viewModeSelection) viewModeSelection.style.display = 'none';
+    if (viewReceiver) viewReceiver.style.display = 'none';
+    if (viewSender) viewSender.style.display = 'none';
+    if (btnBackToHome) btnBackToHome.style.display = 'inline-flex';
+
+    if (viewName === 'home') {
+        if (viewModeSelection) viewModeSelection.style.display = 'flex';
+        if (btnBackToHome) btnBackToHome.style.display = 'none';
+        headerStatusText.textContent = "Tayyor";
+        headerStatus.querySelector('.status-dot').classList.remove('active');
+        stopSenderStream();
+    } else if (viewName === 'receiver') {
+        if (viewReceiver) viewReceiver.style.display = 'flex';
+        initReceiverMode();
+    } else if (viewName === 'sender') {
+        if (viewSender) viewSender.style.display = 'flex';
+        initSenderMode();
+    }
 }
 
-if (/android|iphone|ipad/i.test(navigator.userAgent)) {
-    deviceTypeSelect.value = 'phone';
-} else if (/smart-tv|tizen|googletv/i.test(navigator.userAgent)) {
-    deviceTypeSelect.value = 'tv';
-} else {
-    deviceTypeSelect.value = 'pc';
-}
+if (btnBackToHome) btnBackToHome.addEventListener('click', () => showView('home'));
+if (cardSelectReceive) cardSelectReceive.addEventListener('click', () => showView('receiver'));
+if (cardSelectSend) cardSelectSend.addEventListener('click', () => showView('sender'));
 
-// 1. TIZIM MA'LUMOTLARINI OLISH
-async function loadServerInfo() {
+// 2. QABUL QILUVCHI REJIMINI ISHGA TUSHIRISH (RECEIVER)
+async function initReceiverMode() {
+    if (receiverWaitingBox) receiverWaitingBox.style.display = 'flex';
+    if (streamViewerBox) streamViewerBox.style.display = 'none';
+    if (receiverPinDisplay) receiverPinDisplay.textContent = "Yuklanmoqda...";
+    headerStatusText.textContent = "Kutilmoqda...";
+
+    // Tezkor API ma'lumotini olish
     try {
-        const res = await fetch('/api/info');
+        const res = await fetch('/api/server-info');
         const data = await res.json();
-        serverUrlBox.textContent = data.url;
-        qrCodeImg.src = data.qrCode;
+        if (data && data.qrCode) {
+            if (receiverQrImg) receiverQrImg.src = data.qrCode;
+            if (receiverPinDisplay) receiverPinDisplay.textContent = data.pin || "777888";
+            if (receiverUrlDisplay) receiverUrlDisplay.textContent = data.url;
+            activeRoomPin = data.pin || "777888";
+        }
     } catch (e) {
-        serverUrlBox.textContent = window.location.origin;
+        console.log("Server info fetch xatosi:", e);
     }
-}
-loadServerInfo();
 
-// 2. SOCKET.IO XODISALARI
-socket.on('connect', () => {
-    connectionStatus.querySelector('.status-dot').classList.add('connected');
-    statusText.textContent = "Bog'landi";
-    // Avtomatik xonaga ulanish (qo'lda bosish shart emas)
-    autoJoinRoom();
-});
-
-socket.on('disconnect', () => {
-    connectionStatus.querySelector('.status-dot').classList.remove('connected');
-    statusText.textContent = "Uzildi";
-});
-
-function autoJoinRoom() {
-    const roomId = roomIdInput.value.trim() || "777888";
-    currentRoomId = roomId;
-    const deviceType = deviceTypeSelect.value;
-    const deviceName = getDeviceName();
-
-    socket.emit('join-room', {
-        roomId: currentRoomId,
-        deviceName: deviceName,
-        deviceType: deviceType,
-        isPro: isProUser
+    // Socket orqali yangi dinamik xona ochish
+    socket.emit('create-receiver-room', (res) => {
+        if (res && res.success) {
+            activeRoomPin = res.pin;
+            if (receiverPinDisplay) receiverPinDisplay.textContent = res.pin;
+            if (receiverQrImg) receiverQrImg.src = res.qrCode;
+            if (receiverUrlDisplay) receiverUrlDisplay.textContent = `http://${res.ip}:${res.port}`;
+        }
     });
-
-    joinRoomBtn.innerHTML = '<i class="fa-solid fa-check"></i> Xonadasiz (Faol)';
-    startShareBtn.disabled = false;
 }
 
-// XONADAGI QURILMALAR
-socket.on('room-users', ({ devices, streamerId }) => {
-    deviceCount.textContent = devices.length;
-    deviceList.innerHTML = '';
-
-    devices.forEach(dev => {
-        const li = document.createElement('li');
-        li.className = 'device-item';
-        
-        let icon = 'fa-laptop';
-        if (dev.type === 'phone') icon = 'fa-mobile-screen';
-        if (dev.type === 'tv') icon = 'fa-tv';
-
-        li.innerHTML = `
-            <div class="device-item-left">
-                <i class="fa-solid ${icon}"></i>
-                <span>${dev.name} ${dev.id === socket.id ? '(Siz)' : ''}</span>
-            </div>
-            <div>
-                ${dev.isPro ? '<span class="device-badge-pro">PRO</span>' : ''}
-                ${dev.id === streamerId ? '<span style="color:#22c55e;font-size:0.75rem;"><i class="fa-solid fa-signal-stream"></i> Efirda</span>' : ''}
-            </div>
-        `;
-        deviceList.appendChild(li);
-    });
-});
-
-socket.on('streamer-changed', ({ streamerId, streamerName }) => {
-    if (!streamerId) {
-        remoteVideo.srcObject = null;
-        remoteVideo.style.display = 'block';
-        if (mobileCanvas) mobileCanvas.style.display = 'none';
-        emptyVideoState.style.display = 'flex';
-        resetTimer();
-    } else if (streamerId !== socket.id) {
-        emptyVideoState.style.display = 'none';
+// 3. UZATUVCHI REJIMI (SENDER)
+function initSenderMode() {
+    if (senderStatusMsg) {
+        senderStatusMsg.textContent = '';
+        senderStatusMsg.className = 'stream-status-msg';
     }
-});
+}
 
-// 3. XONAGA QO'SHILISH
-joinRoomBtn.addEventListener('click', () => {
-    const roomId = roomIdInput.value.trim();
-    if (!roomId) return alert("Xona PIN kodini kiriting!");
+if (btnStartPcCast) {
+    btnStartPcCast.addEventListener('click', async () => {
+        const pin = (inputSenderPin ? inputSenderPin.value.trim() : '') || "777888";
 
-    currentRoomId = roomId;
-    const deviceType = deviceTypeSelect.value;
-    const deviceName = getDeviceName();
-
-    socket.emit('join-room', {
-        roomId: currentRoomId,
-        deviceName: deviceName,
-        deviceType: deviceType,
-        isPro: isProUser
-    });
-
-    joinRoomBtn.disabled = true;
-    joinRoomBtn.innerHTML = '<i class="fa-solid fa-check"></i> Xonadasiz';
-    startShareBtn.disabled = false;
-});
-
-generatePinBtn.addEventListener('click', () => {
-    const pin = Math.floor(100000 + Math.random() * 900000);
-    roomIdInput.value = pin;
-});
-
-// 4. EKRANNI UZATISH (STREAMING)
-startShareBtn.addEventListener('click', async () => {
-    try {
-        let stream = null;
-
-        if (window.electronAPI && window.electronAPI.getScreenSources) {
-            try {
+        try {
+            // Ekranni olish
+            let stream = null;
+            if (window.electronAPI && window.electronAPI.getScreenSources) {
                 const sources = await window.electronAPI.getScreenSources();
                 if (sources && sources.length > 0) {
                     stream = await navigator.mediaDevices.getUserMedia({
@@ -204,246 +165,120 @@ startShareBtn.addEventListener('click', async () => {
                             mandatory: {
                                 chromeMediaSource: 'desktop',
                                 chromeMediaSourceId: sources[0].id,
-                                minWidth: isProUser ? 1920 : 1280,
-                                maxWidth: isProUser ? 1920 : 1280,
-                                minHeight: isProUser ? 1080 : 720,
-                                maxHeight: isProUser ? 1080 : 720,
-                                minFrameRate: isProUser ? 60 : 30,
-                                maxFrameRate: isProUser ? 60 : 30
+                                maxWidth: 1920,
+                                maxHeight: 1080,
+                                maxFrameRate: 30
                             }
                         }
                     });
                 }
-            } catch (e) {
-                console.warn("Electron native xatosi:", e);
             }
-        }
 
-        if (!stream) {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-                throw new Error("Telefonda brauzer orqali ekranni uzatish cheklangan. Kompyuter ekranini telefonda tomosha qilishingiz mumkin!");
+            if (!stream) {
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { frameRate: 30 },
+                    audio: false
+                });
             }
-            stream = await navigator.mediaDevices.getDisplayMedia({
-                video: { frameRate: isProUser ? 60 : 30 },
-                audio: false
+
+            localMediaStream = stream;
+
+            // Xonaga ulanish
+            socket.emit('join-as-sender', { pin: pin, deviceName: "Kompyuter (PC)" }, (res) => {
+                if (res && res.success) {
+                    if (btnStartPcCast) btnStartPcCast.style.display = 'none';
+                    if (btnStopPcCast) btnStopPcCast.style.display = 'block';
+                    if (senderStatusMsg) {
+                        senderStatusMsg.textContent = "Ekran muvaffaqiyatli uzatilmoqda!";
+                        senderStatusMsg.className = 'stream-status-msg text-green';
+                    }
+                    startCanvasCapturer(stream);
+                } else {
+                    alert(res ? res.message : "Xonaga ulanib bo'lmadi!");
+                    stopSenderStream();
+                }
             });
-        }
 
-        localStream = stream;
-        remoteVideo.srcObject = localStream;
-        remoteVideo.play().catch(e => console.log(e));
-        emptyVideoState.style.display = 'none';
+            stream.getVideoTracks()[0].onended = () => {
+                stopSenderStream();
+            };
 
-        isStreaming = true;
-        startShareBtn.style.display = 'none';
-        stopShareBtn.style.display = 'flex';
-
-        socket.emit('start-streaming');
-        startSessionTimer();
-
-        localStream.getVideoTracks()[0].onended = () => {
-            stopSharing();
-        };
-
-    } catch (err) {
-        console.error("Ekranni olishda xatolik:", err);
-        alert(err.message);
-    }
-});
-
-function stopSharing() {
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    isStreaming = false;
-    startShareBtn.style.display = 'flex';
-    stopShareBtn.style.display = 'none';
-    emptyVideoState.style.display = 'flex';
-    remoteVideo.srcObject = null;
-
-    stopSessionTimer();
-    socket.emit('stop-streaming');
-
-    Object.values(peerConnections).forEach(pc => pc.close());
-    peerConnections = {};
-}
-
-stopShareBtn.addEventListener('click', stopSharing);
-
-// 5. WEBRTC ALOQASI
-const rtcConfig = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-};
-
-function createPeer(targetId) {
-    if (peerConnections[targetId]) {
-        peerConnections[targetId].close();
-    }
-
-    const pc = new RTCPeerConnection(rtcConfig);
-    peerConnections[targetId] = pc;
-
-    pc.onicecandidate = (event) => {
-        if (event.candidate) {
-            socket.emit('webrtc-ice-candidate', {
-                targetId: targetId,
-                candidate: event.candidate
-            });
-        }
-    };
-
-    pc.ontrack = (event) => {
-        console.log("Video oqimi qabul qilindi!", event.streams[0]);
-        remoteVideo.srcObject = event.streams[0];
-        remoteVideo.play().catch(err => {
-            console.log("Autoplay kutmoqda:", err);
-        });
-        emptyVideoState.style.display = 'none';
-    };
-
-    if (localStream) {
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-    }
-
-    return pc;
-}
-
-async function sendOfferToPeer(targetId) {
-    if (!localStream) return;
-    const pc = createPeer(targetId);
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('webrtc-offer', { targetId: targetId, offer: offer });
-}
-
-socket.on('connect-to-peer', ({ targetId }) => {
-    if (isStreaming) {
-        sendOfferToPeer(targetId);
-    }
-});
-
-socket.on('device-joined', ({ newDeviceId }) => {
-    if (isStreaming) {
-        sendOfferToPeer(newDeviceId);
-    }
-});
-
-socket.on('webrtc-offer', async ({ senderId, offer }) => {
-    const pc = createPeer(senderId);
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('webrtc-answer', { targetId: senderId, answer: answer });
-});
-
-socket.on('webrtc-answer', async ({ senderId, answer }) => {
-    const pc = peerConnections[senderId];
-    if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    }
-});
-
-socket.on('webrtc-ice-candidate', async ({ senderId, candidate }) => {
-    const pc = peerConnections[senderId];
-    if (pc) {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-});
-
-// 6. TAYMER VA LIMITLAR
-function startSessionTimer() {
-    stopSessionTimer();
-    if (isProUser) {
-        timerDisplay.textContent = "Cheksiz (PRO)";
-        sessionTimerBadge.classList.add('pro-unlimited');
-        appWatermark.classList.add('hidden');
-        return;
-    }
-
-    remainingSeconds = FREE_TIME_LIMIT_SEC;
-    appWatermark.classList.remove('hidden');
-
-    timerInterval = setInterval(() => {
-        remainingSeconds--;
-        const m = Math.floor(remainingSeconds / 60);
-        const s = remainingSeconds % 60;
-        timerDisplay.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} (Free)`;
-
-        if (remainingSeconds <= 0) {
-            stopSessionTimer();
-            stopSharing();
-            alert("⏰ Bepul seans vaqti (10 daqiqa) tugadi! Cheksiz ishlatish uchun PRO kodni kiriting.");
-            openProModal();
-        }
-    }, 1000);
-}
-
-function stopSessionTimer() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-    }
-}
-
-function resetTimer() {
-    stopSessionTimer();
-    if (isProUser) {
-        timerDisplay.textContent = "Cheksiz (PRO)";
-    } else {
-        timerDisplay.textContent = "10:00 (Free)";
-    }
-}
-
-// 7. PRO KOD
-function checkProStatusUI() {
-    if (isProUser) {
-        proBtnText.textContent = "PRO Faol";
-        openProModalBtn.classList.add('is-activated');
-        sessionTimerBadge.classList.add('pro-unlimited');
-        timerDisplay.textContent = "Cheksiz (PRO)";
-        appWatermark.classList.add('hidden');
-    }
-}
-checkProStatusUI();
-
-function openProModal() {
-    proModal.classList.add('active');
-    proMessage.textContent = '';
-}
-
-openProModalBtn.addEventListener('click', openProModal);
-closeProModalBtn.addEventListener('click', () => proModal.classList.remove('active'));
-
-submitProCodeBtn.addEventListener('click', () => {
-    const code = proCodeInput.value.trim();
-    if (!code) return;
-
-    socket.emit('verify-pro-code', code, (res) => {
-        if (res.success) {
-            isProUser = true;
-            localStorage.setItem('screen_share_pro', 'true');
-            proMessage.className = 'modal-message success';
-            proMessage.textContent = res.message;
-            checkProStatusUI();
-            setTimeout(() => {
-                proModal.classList.remove('active');
-            }, 1200);
-        } else {
-            proMessage.className = 'modal-message error';
-            proMessage.textContent = res.message;
+        } catch (err) {
+            console.error("Ekran olishda xatolik:", err);
+            if (senderStatusMsg) {
+                senderStatusMsg.textContent = "Xatolik: " + err.message;
+            }
         }
     });
+}
+
+function startCanvasCapturer(stream) {
+    const videoTrack = document.createElement('video');
+    videoTrack.srcObject = stream;
+    videoTrack.play();
+
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+
+    streamInterval = setInterval(() => {
+        if (!localMediaStream) return;
+        if (videoTrack.videoWidth > 0 && videoTrack.videoHeight > 0) {
+            tempCanvas.width = 1280;
+            tempCanvas.height = Math.round(1280 * (videoTrack.videoHeight / videoTrack.videoWidth));
+            tempCtx.drawImage(videoTrack, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            tempCanvas.toBlob((blob) => {
+                if (blob) {
+                    blob.arrayBuffer().then((buf) => {
+                        socket.emit('screen-frame', buf);
+                    });
+                }
+            }, 'image/jpeg', 0.65);
+        }
+    }, 1000 / 30); // 30 FPS
+}
+
+function stopSenderStream() {
+    if (streamInterval) clearInterval(streamInterval);
+    if (localMediaStream) {
+        localMediaStream.getTracks().forEach(t => t.stop());
+        localMediaStream = null;
+    }
+    if (btnStartPcCast) btnStartPcCast.style.display = 'block';
+    if (btnStopPcCast) btnStopPcCast.style.display = 'none';
+    socket.emit('stop-stream');
+}
+
+if (btnStopPcCast) btnStopPcCast.addEventListener('click', stopSenderStream);
+
+// TO'LIQ EKRAN
+if (btnToggleFullscreen) {
+    btnToggleFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            if (streamViewerBox) streamViewerBox.requestFullscreen().catch(err => console.log(err));
+        } else {
+            document.exitFullscreen();
+        }
+    });
+}
+
+if (btnCloseStream) {
+    btnCloseStream.addEventListener('click', () => {
+        showView('home');
+    });
+}
+
+// Boshlang'ich holat: Socket holatini ko'rsatish
+socket.on('connect', () => {
+    if (headerStatus) {
+        headerStatus.querySelector('.status-dot').classList.add('active');
+        if (headerStatusText) headerStatusText.textContent = "Server tayyor";
+    }
 });
 
-// FULLSCREEN
-fullscreenBtn.addEventListener('click', () => {
-    if (!document.fullscreenElement) {
-        remoteVideo.requestFullscreen().catch(err => alert(err.message));
-    } else {
-        document.exitFullscreen();
+socket.on('disconnect', () => {
+    if (headerStatus) {
+        headerStatus.querySelector('.status-dot').classList.remove('active');
+        if (headerStatusText) headerStatusText.textContent = "Aloqa uzildi";
     }
 });
