@@ -1,7 +1,12 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, session } = require('electron');
 const path = require('path');
 
-require('./server.js');
+// Serverni ishga tushirish
+try {
+    require('./server.js');
+} catch (e) {
+    console.log("Server yuklashda ogohlantirish:", e.message);
+}
 
 let mainWindow;
 
@@ -28,8 +33,19 @@ function createWindow() {
         });
     });
 
-    // HTTP orqali bir zumda ochiladi (oq ekran bo'lmaydi)
-    mainWindow.loadURL('http://localhost:4848');
+    // Ishonchli yuklash (Server biroz kechikib ochilsa ham qayta urinadi)
+    function loadURLWithRetry(url, retries = 5) {
+        mainWindow.loadURL(url).catch((err) => {
+            if (retries > 0) {
+                console.log(`Ulanish kutilmoqda (${retries})...`);
+                setTimeout(() => loadURLWithRetry(url, retries - 1), 800);
+            } else {
+                console.error("Yuklashda xatolik:", err);
+            }
+        });
+    }
+
+    loadURLWithRetry('http://localhost:4848');
 
     mainWindow.on('closed', () => {
         mainWindow = null;

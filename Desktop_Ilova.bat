@@ -1,4 +1,7 @@
 @echo off
-title Screen Share Pro (Desktop App)
-echo Screen Share Pro oynasi ochilmoqda...
+title Screen Share Pro
+cd /d "%~dp0"
+echo ===================================================
+echo     SCREEN SHARE PRO ISHGA TUSHMOQDA...
+echo ===================================================
 npm start

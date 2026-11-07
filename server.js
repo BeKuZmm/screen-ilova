@@ -18,6 +18,7 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Har safar real tarmoq IP manzilini yangilab aniqlash
 function getLocalIpAddress() {
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -27,40 +28,49 @@ function getLocalIpAddress() {
             }
         }
     }
-    return 'localhost';
+    return '127.0.0.1';
 }
 
-const localIp = getLocalIpAddress();
-const serverUrl = `http://${localIp}:${PORT}`;
 const computerName = os.hostname() || "Kompyuter (PC)";
-
 const rooms = {};
 
 // UDP Broadcast Beacon: Wi-Fi tarmog'idagi telefonlarga avtomatik o'zini bildirish
-const udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+let udpSocket = null;
+try {
+    udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    udpSocket.on('error', (err) => {
+        // UDP xatosi butun serverni yiqitmasligi uchun
+        console.log("[UDP OGOHLANTIRISH]:", err.message);
+    });
 
-udpSocket.bind(() => {
-    try {
-        udpSocket.setBroadcast(true);
-    } catch (e) {
-        console.log("UDP broadcast xatosi:", e.message);
-    }
-});
+    udpSocket.bind(() => {
+        try {
+            udpSocket.setBroadcast(true);
+        } catch (e) {
+            // broadcast ruxsati cheklangan bo'lsa
+        }
+    });
 
-setInterval(() => {
-    try {
-        const beacon = JSON.stringify({
-            app: "ScreenSharePro",
-            name: computerName,
-            ip: localIp,
-            port: PORT,
-            type: "pc"
-        });
-        udpSocket.send(beacon, 0, beacon.length, UDP_PORT, '255.255.255.255');
-    } catch (err) {
-        // tarmoq o'zgarganda xato bermasligi uchun
-    }
-}, 2000);
+    setInterval(() => {
+        try {
+            const currentIp = getLocalIpAddress();
+            const beacon = JSON.stringify({
+                app: "ScreenSharePro",
+                name: computerName,
+                ip: currentIp,
+                port: PORT,
+                type: "pc"
+            });
+            udpSocket.send(beacon, 0, beacon.length, UDP_PORT, '255.255.255.255', (err) => {
+                // xato bo'lsa tinchgina o'tadi
+            });
+        } catch (err) {
+            // tarmoq o'zgarganda
+        }
+    }, 2000);
+} catch (e) {
+    console.log("UDP ishga tushirishda ogohlantirish:", e.message);
+}
 
 io.on('connection', (socket) => {
     socket.on('join-room', ({ roomId, deviceName, deviceType, isPro }) => {
@@ -116,37 +126,35 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start-streaming', () => {
-        const roomId = socket.roomId;
-        if (!roomId || !rooms[roomId]) return;
-
-        rooms[roomId].streamerId = socket.id;
+        const roomId = socket.roomId || "777888";
+        if (rooms[roomId]) {
+            rooms[roomId].streamerId = socket.id;
+        }
         io.to(roomId).emit('streamer-changed', {
             streamerId: socket.id,
             streamerName: socket.deviceName,
             isPro: socket.isPro
         });
 
-        const others = rooms[roomId].devices.filter(d => d.id !== socket.id);
-        others.forEach(dev => {
-            socket.emit('connect-to-peer', { targetId: dev.id });
-        });
+        if (rooms[roomId]) {
+            const others = rooms[roomId].devices.filter(d => d.id !== socket.id);
+            others.forEach(dev => {
+                socket.emit('connect-to-peer', { targetId: dev.id });
+            });
+        }
     });
 
     socket.on('stop-streaming', () => {
-        const roomId = socket.roomId;
-        if (!roomId || !rooms[roomId]) return;
-
-        if (rooms[roomId].streamerId === socket.id) {
+        const roomId = socket.roomId || "777888";
+        if (rooms[roomId] && rooms[roomId].streamerId === socket.id) {
             rooms[roomId].streamerId = null;
             io.to(roomId).emit('streamer-changed', { streamerId: null });
         }
     });
 
     socket.on('mobile-frame', (frameData) => {
-        const roomId = socket.roomId;
-        if (roomId) {
-            socket.to(roomId).emit('mobile-frame', frameData);
-        }
+        const roomId = socket.roomId || "777888";
+        socket.to(roomId).emit('mobile-frame', frameData);
     });
 
     socket.on('webrtc-offer', ({ targetId, offer }) => {
@@ -179,12 +187,14 @@ io.on('connection', (socket) => {
 
 app.get('/api/info', async (req, res) => {
     try {
-        const qrCodeDataUrl = await QRCode.toDataURL(serverUrl);
+        const currentIp = getLocalIpAddress();
+        const currentUrl = `http://${currentIp}:${PORT}`;
+        const qrCodeDataUrl = await QRCode.toDataURL(currentUrl);
         res.json({
             name: computerName,
-            ip: localIp,
+            ip: currentIp,
             port: PORT,
-            url: serverUrl,
+            url: currentUrl,
             qrCode: qrCodeDataUrl
         });
     } catch (err) {
@@ -192,11 +202,21 @@ app.get('/api/info', async (req, res) => {
     }
 });
 
+// Port xatoliklarini ushlash (EADDRINUSE bo'lsa yiqilmaslik)
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.log(`[XABAR] Port ${PORT} allaqachon ishlab turibdi. Mavjud serverdan foydalaniladi.`);
+    } else {
+        console.error("Server xatosi:", err);
+    }
+});
+
 server.listen(PORT, '0.0.0.0', () => {
+    const currentIp = getLocalIpAddress();
     console.log(`=================================================`);
-    console.log(`🚀 SCREEN SHARE PRO SERVER`);
+    console.log(`🚀 SCREEN SHARE PRO SERVER FAOL`);
     console.log(`💻 Qurilma: ${computerName}`);
-    console.log(`📡 Manzil: ${serverUrl}`);
+    console.log(`📡 IP Manzil: http://${currentIp}:${PORT}`);
     console.log(`📡 UDP Avto-qidiruv mayog'i yoqildi (port: ${UDP_PORT})`);
     console.log(`=================================================`);
 });

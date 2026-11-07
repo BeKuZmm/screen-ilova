@@ -100,12 +100,31 @@ socket = io();
 socket.on('connect', () => {
     connectionStatus.querySelector('.status-dot').classList.add('connected');
     statusText.textContent = "Bog'landi";
+    // Avtomatik xonaga ulanish (qo'lda bosish shart emas)
+    autoJoinRoom();
 });
 
 socket.on('disconnect', () => {
     connectionStatus.querySelector('.status-dot').classList.remove('connected');
     statusText.textContent = "Uzildi";
 });
+
+function autoJoinRoom() {
+    const roomId = roomIdInput.value.trim() || "777888";
+    currentRoomId = roomId;
+    const deviceType = deviceTypeSelect.value;
+    const deviceName = getDeviceName();
+
+    socket.emit('join-room', {
+        roomId: currentRoomId,
+        deviceName: deviceName,
+        deviceType: deviceType,
+        isPro: isProUser
+    });
+
+    joinRoomBtn.innerHTML = '<i class="fa-solid fa-check"></i> Xonadasiz (Faol)';
+    startShareBtn.disabled = false;
+}
 
 // XONADAGI QURILMALAR
 socket.on('room-users', ({ devices, streamerId }) => {
