@@ -21,6 +21,23 @@ const mobileCtx = mobileCanvas ? mobileCanvas.getContext('2d') : null;
 const emptyVideoState = document.getElementById('emptyVideoState');
 const appWatermark = document.getElementById('appWatermark');
 
+// PRO MODAL
+const proModal = document.getElementById('proModal');
+const openProModalBtn = document.getElementById('openProModalBtn');
+const closeProModalBtn = document.getElementById('closeProModalBtn');
+const proCodeInput = document.getElementById('proCodeInput');
+const submitProCodeBtn = document.getElementById('submitProCodeBtn');
+const proMessage = document.getElementById('proMessage');
+const proBtnText = document.getElementById('proBtnText');
+
+// HOLATLAR (STATE)
+const socket = io(); // DARHOL ULASH
+let localStream = null;
+let peerConnections = {}; // targetId -> RTCPeerConnection
+let currentRoomId = null;
+let isStreaming = false;
+let isProUser = localStorage.getItem('screen_share_pro') === 'true';
+
 // Mobil kadrlarni chizish
 const mobileImg = new Image();
 mobileImg.onload = () => {
@@ -42,23 +59,6 @@ socket.on('mobile-frame', (arrayBuffer) => {
     if (mobileCanvas) mobileCanvas.style.display = 'block';
     emptyVideoState.style.display = 'none';
 });
-
-// PRO MODAL
-const proModal = document.getElementById('proModal');
-const openProModalBtn = document.getElementById('openProModalBtn');
-const closeProModalBtn = document.getElementById('closeProModalBtn');
-const proCodeInput = document.getElementById('proCodeInput');
-const submitProCodeBtn = document.getElementById('submitProCodeBtn');
-const proMessage = document.getElementById('proMessage');
-const proBtnText = document.getElementById('proBtnText');
-
-// HOLATLAR (STATE)
-let socket;
-let localStream = null;
-let peerConnections = {}; // targetId -> RTCPeerConnection
-let currentRoomId = null;
-let isStreaming = false;
-let isProUser = localStorage.getItem('screen_share_pro') === 'true';
 
 // LIMITLAR
 const FREE_TIME_LIMIT_SEC = 10 * 60; // 10 daqiqa
@@ -94,9 +94,7 @@ async function loadServerInfo() {
 }
 loadServerInfo();
 
-// 2. SOCKET.IO GA ULANISH
-socket = io();
-
+// 2. SOCKET.IO XODISALARI
 socket.on('connect', () => {
     connectionStatus.querySelector('.status-dot').classList.add('connected');
     statusText.textContent = "Bog'landi";
