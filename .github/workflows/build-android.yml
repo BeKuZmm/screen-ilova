@@ -1,4 +1,4 @@
-name: Build Android APK and AAB
+name: Build Android APK
 
 on:
   push:
@@ -18,18 +18,18 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: gradle
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
-    - name: Build APK
+    - name: Build APK with Gradle
       run: |
         cd android-client
-        chmod +x gradlew.bat || true
-        gradle assembleRelease || ./gradlew assembleRelease
+        gradle assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: ScreenSharePro-Release-APK
-        path: android-client/app/build/outputs/apk/release/*.apk
+        name: ScreenSharePro-Debug-APK
+        path: android-client/app/build/outputs/apk/debug/*.apk
