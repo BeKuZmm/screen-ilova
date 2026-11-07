@@ -3,15 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#070B14">
+    android:background="#0A0D14">
 
-    <!-- 1. ASOSIY REJIM OYNASI (HOME) -->
+    <!-- 1. ASOSIY REJIM OYNASI (BENTO GRID HOME) -->
     <LinearLayout
         android:id="@+id/layoutModeSelection"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="20dp"
+        android:padding="18dp"
         android:visibility="visible">
 
         <!-- TOP BAR -->
@@ -20,8 +20,8 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="24dp">
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="18dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -34,21 +34,21 @@
                     android:layout_height="wrap_content"
                     android:text="ScreenShare"
                     android:textColor="#F9FAFB"
-                    android:textSize="22sp"
+                    android:textSize="20sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="PRO"
-                    android:textColor="#070B14"
+                    android:textColor="#0A0D14"
                     android:background="@drawable/btn_gradient_cyan"
-                    android:textSize="11sp"
+                    android:textSize="10sp"
                     android:textStyle="bold"
-                    android:paddingStart="7dp"
-                    android:paddingEnd="7dp"
-                    android:paddingTop="3dp"
-                    android:paddingBottom="3dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
                     android:layout_marginStart="8dp" />
             </LinearLayout>
 
@@ -63,9 +63,9 @@
                 android:layout_height="wrap_content"
                 android:text="● Wi-Fi Tayyor"
                 android:textColor="#10B981"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                android:background="#111827"
+                android:background="@drawable/bento_status_pill"
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:paddingTop="4dp"
@@ -83,197 +83,230 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- ASOSIY KARTA: EKRANNI KOMPYUTERGA UZATISH -->
+                <!-- BENTO 1: HERO QR SKANER KARTASI -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:background="@drawable/card_hero_gradient"
+                    android:background="@drawable/bento_hero_gradient"
                     android:padding="20dp"
-                    android:layout_marginBottom="18dp">
+                    android:layout_marginBottom="12dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="⚡ TEZKOR VA OSON"
-                        android:textColor="#00E5FF"
-                        android:textSize="11sp"
+                        android:text="⚡ TEZKOR ULASH"
+                        android:textColor="#0A0D14"
                         android:textStyle="bold"
-                        android:layout_marginBottom="6dp" />
+                        android:textSize="10sp"
+                        android:background="#20FFFFFF"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:layout_marginBottom="8dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ekranni Kompyuterga Chiqarish"
-                        android:textColor="#F9FAFB"
-                        android:textSize="18sp"
+                        android:text="QR Skaner"
+                        android:textColor="#FFFFFF"
+                        android:textSize="22sp"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp" />
+                        android:layout_marginBottom="2dp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Telefon ekranini kompyuter monitorida jonli ko'rsatish"
-                        android:textColor="#9CA3AF"
-                        android:textSize="13sp"
-                        android:layout_marginBottom="18dp" />
-
-                    <!-- KATTA ASOSIY QR SKANER TUGMASI -->
-                    <Button
-                        android:id="@+id/btnScanQr"
-                        android:layout_width="match_parent"
-                        android:layout_height="54dp"
-                        android:text="📷  QR-KODNI SKANERLASH"
-                        android:textColor="#070B14"
-                        android:textStyle="bold"
-                        android:textSize="15sp"
-                        android:background="@drawable/btn_gradient_cyan"
-                        android:layout_marginBottom="6dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:text="Kompyuter ekranidagi QR-kodga qarating"
-                        android:textColor="#6B7280"
+                        android:text="Kompyuter ekranidagi kodga kamerani qarating"
+                        android:textColor="#E0F2FE"
                         android:textSize="12sp"
                         android:layout_marginBottom="16dp" />
 
-                    <View
+                    <!-- ASOSIY QR TUGMASI -->
+                    <Button
+                        android:id="@+id/btnScanQr"
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#1F2937"
-                        android:layout_marginBottom="16dp" />
-
-                    <!-- QO'LDA ULASH BO'LIMI -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Yoki IP va PIN kod orqali ulaning:"
-                        android:textColor="#D1D5DB"
-                        android:textSize="13sp"
+                        android:layout_height="50dp"
+                        android:text="📷  SKANERLASHNI BOSHLASH"
+                        android:textColor="#00E5FF"
                         android:textStyle="bold"
-                        android:layout_marginBottom="10dp" />
-
-                    <EditText
-                        android:id="@+id/etTargetIp"
-                        android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:background="@drawable/input_field_bg"
-                        android:hint="Kompyuter IP (masalan: 10.121.221.21)"
-                        android:textColor="#F9FAFB"
-                        android:textColorHint="#4B5563"
                         android:textSize="14sp"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:singleLine="true"
-                        android:layout_marginBottom="10dp" />
+                        android:background="@drawable/bento_hero_btn" />
+                </LinearLayout>
 
+                <!-- BENTO 2 & 3: 2 USTUNLI BLOK (PIN + QO'LDA ULASH) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:layout_marginBottom="12dp">
+
+                    <!-- CHAP: PIN KODI BLOKI -->
                     <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:background="@drawable/bento_card_bg"
+                        android:padding="12dp"
+                        android:gravity="center"
+                        android:layout_marginEnd="6dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="XONA PIN:"
+                            android:textColor="#64748B"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="4dp" />
 
                         <EditText
                             android:id="@+id/etTargetPin"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:background="@drawable/input_field_bg"
-                            android:hint="PIN: 777888"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@null"
+                            android:hint="777888"
                             android:textColor="#00E5FF"
-                            android:textColorHint="#4B5563"
-                            android:textSize="15sp"
+                            android:textColorHint="#334155"
+                            android:textSize="18sp"
                             android:textStyle="bold"
-                            android:paddingStart="14dp"
-                            android:paddingEnd="14dp"
+                            android:gravity="center"
                             android:maxLength="6"
-                            android:inputType="number"
-                            android:layout_marginEnd="10dp" />
-
-                        <Button
-                            android:id="@+id/btnConnectManual"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:text="ULANISH ➔"
-                            android:textColor="#00E5FF"
-                            android:textStyle="bold"
-                            android:textSize="13sp"
-                            android:background="@drawable/btn_card_outline"
-                            android:paddingStart="16dp"
-                            android:paddingEnd="16dp" />
+                            android:inputType="number" />
                     </LinearLayout>
+
+                    <!-- O'NG: ULANISH TUGMASI BLOKI -->
+                    <Button
+                        android:id="@+id/btnConnectManual"
+                        android:layout_width="0dp"
+                        android:layout_height="88dp"
+                        android:layout_weight="1"
+                        android:text="ULANISH ➔\nQo'lda ulash"
+                        android:textColor="#00E5FF"
+                        android:textStyle="bold"
+                        android:textSize="13sp"
+                        android:lineSpacingExtra="2dp"
+                        android:background="@drawable/bento_btn_outline"
+                        android:layout_marginStart="6dp" />
                 </LinearLayout>
 
-                <!-- IKKILAMCHI KARTA: EKRANNI TELEFONDA QABUL QILISH -->
+                <!-- BENTO 4: IP ADRES KIRITISH BLOKI -->
                 <LinearLayout
-                    android:id="@+id/cardReceiveScreen"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="@drawable/card_bg"
-                    android:padding="20dp"
-                    android:layout_marginBottom="24dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bento_card_bg"
+                    android:padding="12dp"
+                    android:layout_marginBottom="12dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ekranni Telefonda Qabul Qilish"
-                        android:textColor="#F9FAFB"
-                        android:textSize="17sp"
+                        android:text="🌐 IP:"
+                        android:textColor="#64748B"
+                        android:textSize="12sp"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp" />
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="8dp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Kompyuter monitorini ushbu telefonda tomosha qilish"
-                        android:textColor="#9CA3AF"
+                    <EditText
+                        android:id="@+id/etTargetIp"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bento_input_bg"
+                        android:hint="Kompyuter IP (masalan: 10.121.221.21)"
+                        android:textColor="#F9FAFB"
+                        android:textColorHint="#475569"
                         android:textSize="13sp"
-                        android:layout_marginBottom="16dp" />
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:singleLine="true" />
+                </LinearLayout>
+
+                <!-- BENTO 5: QABUL QILISH BLOKI -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bento_card_bg"
+                    android:padding="16dp"
+                    android:layout_marginBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Ekranni Qabul Qilish"
+                            android:textColor="#F9FAFB"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="2dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Kompyuter ekranini telefonda ko'rish"
+                            android:textColor="#64748B"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <Button
                         android:id="@+id/btnOpenReceiver"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:text="📥  Qabul qilishni boshlash"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:text="📥  Kirish"
                         android:textColor="#10B981"
                         android:textStyle="bold"
-                        android:textSize="14sp"
-                        android:background="@drawable/btn_card_outline" />
+                        android:textSize="12sp"
+                        android:background="@drawable/bento_btn_emerald"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
+                        android:layout_marginStart="8dp" />
                 </LinearLayout>
 
             </LinearLayout>
         </ScrollView>
     </LinearLayout>
 
-    <!-- 2. JONLI EFIR UZATILMOQDA OYNASI (STREAMING ACTIVE) -->
+    <!-- 2. JONLI EFIR UZATILMOQDA OYNASI (STREAMING ACTIVE - BENTO USLUBIDA) -->
     <LinearLayout
         android:id="@+id/layoutStreamingActive"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="28dp"
+        android:padding="24dp"
         android:gravity="center"
         android:visibility="gone">
 
-        <!-- STATUS KARTASI -->
+        <!-- STATUS BENTO KARTASI -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_hero_gradient"
-            android:padding="24dp"
+            android:background="@drawable/bento_card_bg"
+            android:padding="28dp"
             android:gravity="center"
-            android:layout_marginBottom="32dp">
+            android:layout_marginBottom="24dp">
 
             <ImageView
                 android:layout_width="72dp"
                 android:layout_height="72dp"
                 android:src="@android:drawable/stat_sys_upload"
                 app:tint="#00E5FF"
-                android:layout_marginBottom="16dp" />
+                android:background="@drawable/bento_live_icon_bg"
+                android:padding="16dp"
+                android:layout_marginBottom="20dp" />
 
             <TextView
                 android:id="@+id/tvStreamingLiveBadge"
@@ -281,7 +314,7 @@
                 android:layout_height="wrap_content"
                 android:text="🟢  JONLI EFIR UZATILMOQDA"
                 android:textColor="#10B981"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp" />
 
@@ -290,8 +323,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Kompyuter: 10.121.221.21"
-                android:textColor="#F9FAFB"
-                android:textSize="15sp"
+                android:textColor="#E2E8F0"
+                android:textSize="14sp"
                 android:layout_marginBottom="4dp" />
 
             <TextView
@@ -304,25 +337,28 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- ESLATMA KARTASI -->
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💡 Telefoningiz ekrani hozir kompyuterda jonli ko'rinmoqda.\nIlovani fonga tushirib istalgan dastur yoki o'yinni ochishingiz mumkin."
-            android:textColor="#9CA3AF"
-            android:textSize="14sp"
+            android:text="💡 Telefoningiz ekrani kompyuterda jonli ko'rinmoqda.\nIlovani fonga tushirib istalgan dastur yoki o'yinni ochishingiz mumkin."
+            android:textColor="#94A3B8"
+            android:textSize="13sp"
             android:gravity="center"
-            android:lineSpacingExtra="4dp"
-            android:layout_marginBottom="36dp" />
+            android:lineSpacingExtra="3dp"
+            android:background="@drawable/bento_card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="28dp" />
 
         <Button
             android:id="@+id/btnStopStreaming"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="52dp"
             android:text="🛑  EFIRNI TO'XTATISH"
             android:textColor="@android:color/white"
             android:textStyle="bold"
-            android:textSize="15sp"
-            android:background="@drawable/btn_danger_red" />
+            android:textSize="14sp"
+            android:background="@drawable/bento_btn_danger" />
     </LinearLayout>
 
     <!-- 3. JONLI EFIR QABUL QILUVCHI OYNA (RECEIVER VIEW) -->
