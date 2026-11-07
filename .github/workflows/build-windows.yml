@@ -23,6 +23,8 @@ jobs:
       run: npm install
 
     - name: Build Windows Executable (.exe)
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: npm run build:win
 
     - name: Upload Windows Executable Artifacts
