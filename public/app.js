@@ -29,6 +29,7 @@ const senderCastStatus = document.getElementById('senderCastStatus');
 const socket = io();
 let currentRoomPin = "777888";
 let currentRotation = 0; // 0, 90, 180, 270
+let isCapturingDesktop = false;
 let localScreenStream = null;
 let senderInterval = null;
 
@@ -59,7 +60,7 @@ streamImg.onload = () => {
     }
     canvasCtx.restore();
 
-    // FPS o'lchash
+    // FPS hisoblash
     frameCount++;
     const now = performance.now();
     if (now - lastFpsTime >= 1000) {
@@ -71,12 +72,15 @@ streamImg.onload = () => {
 
 let activeBlobUrl = null;
 
+// FAQAT TASHQI QURILMALARDAN KELGAN KADRLARNI CHIZISH
 function renderIncomingFrame(data) {
+    // Agar kompyuter o'z ekranini uzatayotgan bo'lsa, uni o'ziga chizmaslik (Loopback / Cheksiz oyna oldini olish!)
+    if (isCapturingDesktop) return;
+
     // 1. Agar kutish paneli ochiq bo'lsa, uni yopib jonli efirni ochamiz
     if (qrWaitingPanel && qrWaitingPanel.style.display !== 'none') {
         qrWaitingPanel.style.display = 'none';
         liveStreamPanel.style.display = 'flex';
-        // Tabni ham receiver holatiga keltirish
         switchTab('receiver');
     }
 
@@ -91,10 +95,9 @@ function renderIncomingFrame(data) {
     }
 }
 
-// BARCHA EFIR HODISALARINI TINGLASH
+// FAQAT SERVERDAN TARKATILGAN KADRLARNI TINGLASH (o'zining screen-frame hodisasini tinglamaslik!)
 socket.on('incoming-screen-frame', renderIncomingFrame);
 socket.on('mobile-frame', renderIncomingFrame);
-socket.on('screen-frame', renderIncomingFrame);
 
 // SENDER ULANDI
 socket.on('sender-connected', ({ deviceName }) => {
@@ -103,7 +106,7 @@ socket.on('sender-connected', ({ deviceName }) => {
     }
 });
 
-// SENDER UZILDI YOKI TO'XTATILDI
+// SENDER UZILDI
 function onStreamDisconnected() {
     if (liveStreamPanel) liveStreamPanel.style.display = 'none';
     if (qrWaitingPanel) qrWaitingPanel.style.display = 'block';
@@ -116,7 +119,7 @@ socket.on('sender-disconnected', onStreamDisconnected);
 socket.on('stream-stopped', onStreamDisconnected);
 socket.on('room-closed', onStreamDisconnected);
 
-// 1. TIZIM MA'LUMOTLARINI DARHOL OLISH
+// 1. TIZIM MA'LUMOTLARINI OLISH
 async function loadServerInfo() {
     try {
         const res = await fetch('/api/server-info');
@@ -127,7 +130,7 @@ async function loadServerInfo() {
             if (pcQrCodeImg && data.qrCode) pcQrCodeImg.src = data.qrCode;
             currentRoomPin = data.pin || "777888";
 
-            // Socket orqali xonaga qo'shilish
+            // Faqat qabul qiluvchi sifatida xonaga kirish
             socket.emit('join-as-receiver', { pin: currentRoomPin });
             socket.emit('join-room', { roomId: currentRoomPin });
         }
@@ -164,7 +167,7 @@ btnToggleFull.addEventListener('click', () => {
     }
 });
 
-// 4. EKRANNI BURISH (LANDSCAPE / PORTRAIT)
+// 4. EKRANNI BURISH
 btnRotateStream.addEventListener('click', () => {
     currentRotation = (currentRotation + 90) % 360;
     if (streamImg.src) {
@@ -178,7 +181,7 @@ btnDisconnectStream.addEventListener('click', () => {
     onStreamDisconnected();
 });
 
-// 6. KOMPYUTER EKRANINI UZATISH (SENDER)
+// 6. KOMPYUTER EKRANINI UZATISH (FAKAT TALAB ETILGANDA)
 btnStartPcShare.addEventListener('click', async () => {
     const pin = (targetPinInput ? targetPinInput.value.trim() : '') || currentRoomPin;
 
@@ -210,11 +213,12 @@ btnStartPcShare.addEventListener('click', async () => {
         }
 
         localScreenStream = stream;
+        isCapturingDesktop = true;
 
         socket.emit('join-as-sender', { pin: pin, deviceName: "Kompyuter (PC)" }, (res) => {
             btnStartPcShare.style.display = 'none';
             btnStopPcShare.style.display = 'block';
-            senderCastStatus.textContent = "Kompyuter ekrani muvaffaqiyatli uzatilmoqda!";
+            senderCastStatus.textContent = "🟢 Kompyuteringiz ekrani uzatilmoqda. Ikkinchi qurilma ushbu PIN orqali ko'ra oladi.";
 
             startDesktopCaptureLoop(stream);
         });
@@ -226,6 +230,7 @@ btnStartPcShare.addEventListener('click', async () => {
     } catch (err) {
         console.error("Ekran olishda xatolik:", err);
         senderCastStatus.textContent = "Xatolik: " + err.message;
+        isCapturingDesktop = false;
     }
 });
 
@@ -238,14 +243,14 @@ function startDesktopCaptureLoop(stream) {
     const tempCtx = tempCanvas.getContext('2d');
 
     senderInterval = setInterval(() => {
-        if (!localScreenStream) return;
+        if (!localScreenStream || !isCapturingDesktop) return;
         if (videoElem.videoWidth > 0 && videoElem.videoHeight > 0) {
             tempCanvas.width = 1280;
             tempCanvas.height = Math.round(1280 * (videoElem.videoHeight / videoElem.videoWidth));
             tempCtx.drawImage(videoElem, 0, 0, tempCanvas.width, tempCanvas.height);
 
             tempCanvas.toBlob((blob) => {
-                if (blob) {
+                if (blob && isCapturingDesktop) {
                     blob.arrayBuffer().then((buf) => {
                         socket.emit('screen-frame', buf);
                     });
@@ -256,6 +261,7 @@ function startDesktopCaptureLoop(stream) {
 }
 
 function stopDesktopShare() {
+    isCapturingDesktop = false;
     if (senderInterval) clearInterval(senderInterval);
     if (localScreenStream) {
         localScreenStream.getTracks().forEach(t => t.stop());
