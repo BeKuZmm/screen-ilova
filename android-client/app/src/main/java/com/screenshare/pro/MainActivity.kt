@@ -2,10 +2,14 @@ package com.screenshare.pro
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.media.projection.MediaProjectionManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -44,12 +48,16 @@ class MainActivity : AppCompatActivity() {
 
     // ASOSIY SAHIFA ELEMENTLARI
     private lateinit var btnScanQr: Button
-    private lateinit var btnManualPin: Button
+    private lateinit var etTargetIp: EditText
+    private lateinit var etTargetPin: EditText
+    private lateinit var btnConnectManual: Button
     private lateinit var btnOpenReceiver: Button
     private lateinit var tvHeaderStatus: TextView
 
     // EFIR HOLATI ELEMENTLARI
+    private lateinit var tvStreamingLiveBadge: TextView
     private lateinit var tvStreamingTarget: TextView
+    private lateinit var tvStreamingPin: TextView
     private lateinit var btnStopStreaming: Button
 
     // QABUL QILUVCHI ELEMENTLAR
@@ -60,12 +68,33 @@ class MainActivity : AppCompatActivity() {
     // PROJECTION & NETWORK
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private var isStreaming = false
-    private var targetServerIp = ""
+    private var targetServerIp = "10.121.221.21"
     private var targetServerPort = 4848
     private var targetRoomPin = "777888"
 
     private var receiverSocket: Socket? = null
     private var udpDiscoveryJob: Job? = null
+
+    // BROADCAST RECEIVER (Xizmat holatini tinglash)
+    private val streamStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ScreenCaptureService.ACTION_STREAM_CONNECTED -> {
+                    tvStreamingLiveBadge.text = "🟢  JONLI EFIR UZATILMOQDA"
+                    tvStreamingLiveBadge.setTextColor(0xFF10B981.toInt())
+                    Toast.makeText(this@MainActivity, "Kompyuterga ulandi! Efir boshlandi.", Toast.LENGTH_SHORT).show()
+                }
+                ScreenCaptureService.ACTION_STREAM_FAILED -> {
+                    val errorMsg = intent.getStringExtra("ERROR_MSG") ?: "Ulanish xatosi"
+                    showConnectionErrorDialog(errorMsg)
+                    stopStreamingService()
+                }
+                ScreenCaptureService.ACTION_STREAM_STOPPED -> {
+                    stopStreamingService()
+                }
+            }
+        }
+    }
 
     // QR SCANNER LAUNCHER (ZXing)
     private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
@@ -76,6 +105,8 @@ class MainActivity : AppCompatActivity() {
                 targetServerIp = ip
                 targetServerPort = port
                 targetRoomPin = pin
+                etTargetIp.setText(ip)
+                etTargetPin.setText(pin)
                 Toast.makeText(this, "QR o'qildi: $ip (PIN: $pin)", Toast.LENGTH_SHORT).show()
                 requestScreenProjection()
             } else {
@@ -107,11 +138,15 @@ class MainActivity : AppCompatActivity() {
         layoutReceiverWaiting = findViewById(R.id.layoutReceiverWaiting)
 
         btnScanQr = findViewById(R.id.btnScanQr)
-        btnManualPin = findViewById(R.id.btnManualPin)
+        etTargetIp = findViewById(R.id.etTargetIp)
+        etTargetPin = findViewById(R.id.etTargetPin)
+        btnConnectManual = findViewById(R.id.btnConnectManual)
         btnOpenReceiver = findViewById(R.id.btnOpenReceiver)
         tvHeaderStatus = findViewById(R.id.tvHeaderStatus)
 
+        tvStreamingLiveBadge = findViewById(R.id.tvStreamingLiveBadge)
         tvStreamingTarget = findViewById(R.id.tvStreamingTarget)
+        tvStreamingPin = findViewById(R.id.tvStreamingPin)
         btnStopStreaming = findViewById(R.id.btnStopStreaming)
 
         ivReceivedScreen = findViewById(R.id.ivReceivedScreen)
@@ -120,17 +155,35 @@ class MainActivity : AppCompatActivity() {
 
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
-        // 1. Asosiy tugma: QR Kod skanerlash
+        // Standart qiymatlarni o'rnatish
+        etTargetIp.setText(targetServerIp)
+        etTargetPin.setText(targetRoomPin)
+
+        // Wi-Fi tekshirish
+        checkNetworkStatus()
+
+        // 1. QR Kod skanerlash
         btnScanQr.setOnClickListener {
             launchQrScanner()
         }
 
-        // 2. PIN va IP orqali ulanish
-        btnManualPin.setOnClickListener {
-            showManualConnectDialog()
+        // 2. To'g'ridan-to'g'ri kartadagi ULANISH tugmasi
+        btnConnectManual.setOnClickListener {
+            val rawIp = etTargetIp.text.toString().trim()
+            val pin = etTargetPin.text.toString().trim().ifEmpty { "777888" }
+
+            if (rawIp.isNotEmpty()) {
+                val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(rawIp)
+                targetServerIp = cleanHost
+                targetServerPort = cleanPort
+                targetRoomPin = pin
+                requestScreenProjection()
+            } else {
+                Toast.makeText(this, "Iltimos, kompyuter IP manzilini kiriting!", Toast.LENGTH_SHORT).show()
+            }
         }
 
-        // 3. Ekranni qabul qilish
+        // 3. Ekranni telefonda qabul qilish
         btnOpenReceiver.setOnClickListener {
             showReceiverDialog()
         }
@@ -146,6 +199,48 @@ class MainActivity : AppCompatActivity() {
         }
 
         startPassiveUdpDiscovery()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter().apply {
+            addAction(ScreenCaptureService.ACTION_STREAM_CONNECTED)
+            addAction(ScreenCaptureService.ACTION_STREAM_FAILED)
+            addAction(ScreenCaptureService.ACTION_STREAM_STOPPED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(streamStatusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(streamStatusReceiver, filter)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            unregisterReceiver(streamStatusReceiver)
+        } catch (e: Exception) {}
+    }
+
+    private fun checkNetworkStatus() {
+        val connMgr = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNet = connMgr.activeNetwork
+        val caps = connMgr.getNetworkCapabilities(activeNet)
+
+        val isWifi = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        if (isWifi) {
+            tvHeaderStatus.text = "● Wi-Fi: Ulangan"
+            tvHeaderStatus.setTextColor(0xFF10B981.toInt())
+        } else {
+            val isCellular = caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+            if (isCellular) {
+                tvHeaderStatus.text = "⚠️ Mobil internet (Wi-Fi yo'q)"
+                tvHeaderStatus.setTextColor(0xFFEF4444.toInt())
+            } else {
+                tvHeaderStatus.text = "● Tarmoq yo'q"
+                tvHeaderStatus.setTextColor(0xFF6B7280.toInt())
+            }
+        }
     }
 
     private fun launchQrScanner() {
@@ -164,10 +259,11 @@ class MainActivity : AppCompatActivity() {
         try {
             if (content.startsWith("{")) {
                 val json = JSONObject(content)
-                val ip = json.optString("ip", "")
+                val rawIp = json.optString("ip", "")
                 val port = json.optInt("port", 4848)
                 val pin = json.optString("pin", "777888")
-                if (ip.isNotEmpty()) return Triple(ip, port, pin)
+                val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(rawIp, port)
+                if (cleanHost.isNotEmpty()) return Triple(cleanHost, cleanPort, pin)
             }
         } catch (e: Exception) {}
 
@@ -181,18 +277,13 @@ class MainActivity : AppCompatActivity() {
                 if (query.contains("pin=")) {
                     pin = query.substringAfter("pin=").substringBefore("&")
                 }
-                return Triple(host, port, pin)
+                val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(host, port)
+                return Triple(cleanHost, cleanPort, pin)
             }
         } catch (e: Exception) {}
 
-        if (content.contains(":")) {
-            val parts = content.split(":")
-            val ip = parts[0].trim()
-            val port = parts[1].trim().toIntOrNull() ?: 4848
-            return Triple(ip, port, "777888")
-        }
-
-        return Triple(content.trim(), 4848, "777888")
+        val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(content)
+        return Triple(cleanHost, cleanPort, "777888")
     }
 
     private fun requestScreenProjection() {
@@ -219,8 +310,10 @@ class MainActivity : AppCompatActivity() {
         layoutReceiverActive.visibility = View.GONE
         layoutStreamingActive.visibility = View.VISIBLE
 
-        tvStreamingTarget.text = "Kompyuter: $targetServerIp\nXona PIN: $targetRoomPin"
-        tvHeaderStatus.text = "● Efir faol"
+        tvStreamingLiveBadge.text = "🟡  ULANMOQDA..."
+        tvStreamingLiveBadge.setTextColor(0xFF00E5FF.toInt())
+        tvStreamingTarget.text = "Kompyuter: $targetServerIp:$targetServerPort"
+        tvStreamingPin.text = "Xona PIN: $targetRoomPin"
     }
 
     private fun stopStreamingService() {
@@ -231,45 +324,14 @@ class MainActivity : AppCompatActivity() {
         layoutStreamingActive.visibility = View.GONE
         layoutReceiverActive.visibility = View.GONE
         layoutModeSelection.visibility = View.VISIBLE
-        tvHeaderStatus.text = "● Wi-Fi Tayyor"
+        checkNetworkStatus()
     }
 
-    private fun showManualConnectDialog() {
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(60, 40, 60, 20)
-        }
-
-        val etIp = EditText(this).apply {
-            hint = "Kompyuter IP (masalan: 10.121.221.21)"
-            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "")
-        }
-
-        val etPin = EditText(this).apply {
-            hint = "6 xonali PIN (masalan: 777888)"
-            setText(targetRoomPin)
-        }
-
-        container.addView(etIp)
-        container.addView(etPin)
-
+    private fun showConnectionErrorDialog(errorMsg: String) {
         AlertDialog.Builder(this)
-            .setTitle("Kompyuterga ulanish")
-            .setMessage("Kompyuter ekranidagi IP va PIN kodni kiriting:")
-            .setView(container)
-            .setPositiveButton("Ulanish") { _, _ ->
-                val ip = etIp.text.toString().trim()
-                val pin = etPin.text.toString().trim().ifEmpty { "777888" }
-                if (ip.isNotEmpty()) {
-                    targetServerIp = ip
-                    targetServerPort = 4848
-                    targetRoomPin = pin
-                    requestScreenProjection()
-                } else {
-                    Toast.makeText(this, "IP manzilni kiriting!", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Bekor qilish", null)
+            .setTitle("Kompyuterga ulanib bo'lmadi")
+            .setMessage("Xatolik: $errorMsg\n\nIltimos, quyidagilarni tekshiring:\n1. Telefoningiz va Kompyuteringiz bir xil Wi-Fi tarmog'iga ulangan bo'lishi kerak (Mobil internetda ishlamaydi).\n2. Kompyuterda ScreenShare Pro dasturi ishlab turganiga ishonch hosil qiling.")
+            .setPositiveButton("Tushundim", null)
             .show()
     }
 
@@ -281,7 +343,7 @@ class MainActivity : AppCompatActivity() {
 
         val etIp = EditText(this).apply {
             hint = "Server IP (masalan: 10.121.221.21)"
-            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "")
+            setText(targetServerIp)
         }
 
         val etPin = EditText(this).apply {
@@ -297,17 +359,18 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Uzatuvchi kompyuter IP va PIN kodini kiriting:")
             .setView(container)
             .setPositiveButton("Ko'rish") { _, _ ->
-                val ip = etIp.text.toString().trim()
+                val rawIp = etIp.text.toString().trim()
                 val pin = etPin.text.toString().trim().ifEmpty { "777888" }
-                if (ip.isNotEmpty()) {
-                    startReceiverMode(ip, 4848, pin)
+                if (rawIp.isNotEmpty()) {
+                    val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(rawIp)
+                    startReceiverMode(cleanHost, cleanPort, pin)
                 }
             }
             .setNegativeButton("Bekor qilish", null)
             .show()
     }
 
-    private fun startReceiverMode(ip: String, port: Int, pin: String) {
+    private fun startReceiverMode(host: String, port: Int, pin: String) {
         layoutModeSelection.visibility = View.GONE
         layoutStreamingActive.visibility = View.GONE
         layoutReceiverActive.visibility = View.VISIBLE
@@ -315,7 +378,8 @@ class MainActivity : AppCompatActivity() {
 
         try {
             val opts = IO.Options().apply { reconnection = true }
-            receiverSocket = IO.socket("http://$ip:$port", opts)
+            val socketUrl = "http://$host:$port"
+            receiverSocket = IO.socket(socketUrl, opts)
             receiverSocket?.connect()
 
             receiverSocket?.on(Socket.EVENT_CONNECT) {
@@ -384,10 +448,15 @@ class MainActivity : AppCompatActivity() {
                     val ip = json.optString("ip", "")
                     val pin = json.optString("pin", "777888")
                     if (ip.isNotEmpty()) {
+                        val (cleanHost, cleanPort) = ScreenCaptureService.parseHostAndPort(ip)
                         withContext(Dispatchers.Main) {
-                            targetServerIp = ip
+                            targetServerIp = cleanHost
+                            targetServerPort = cleanPort
                             targetRoomPin = pin
+                            etTargetIp.setText(cleanHost)
+                            etTargetPin.setText(pin)
                             tvHeaderStatus.text = "● Kompyuter topildi"
+                            tvHeaderStatus.setTextColor(0xFF10B981.toInt())
                         }
                     }
                 }

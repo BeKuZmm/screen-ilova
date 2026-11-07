@@ -46,6 +46,30 @@ class ScreenCaptureService : Service() {
         const val EXTRA_SERVER_IP = "SERVER_IP"
         const val EXTRA_SERVER_PORT = "SERVER_PORT"
         const val EXTRA_ROOM_PIN = "ROOM_PIN"
+
+        const val ACTION_STREAM_CONNECTED = "com.screenshare.pro.STREAM_CONNECTED"
+        const val ACTION_STREAM_FAILED = "com.screenshare.pro.STREAM_FAILED"
+        const val ACTION_STREAM_STOPPED = "com.screenshare.pro.STREAM_STOPPED"
+
+        fun parseHostAndPort(rawInput: String, defaultPort: Int = 4848): Pair<String, Int> {
+            var clean = rawInput.trim()
+            if (clean.startsWith("http://", ignoreCase = true)) clean = clean.substring(7)
+            if (clean.startsWith("https://", ignoreCase = true)) clean = clean.substring(8)
+            clean = clean.substringBefore("/")
+
+            var host = clean
+            var port = defaultPort
+
+            if (clean.contains(":")) {
+                val parts = clean.split(":")
+                host = parts[0].trim()
+                val p = parts[1].trim().toIntOrNull()
+                if (p != null && p in 1..65535) {
+                    port = p
+                }
+            }
+            return Pair(host, port)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -61,7 +85,6 @@ class ScreenCaptureService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        // Android 14+ da ForegroundServiceType majburiy
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
@@ -80,12 +103,12 @@ class ScreenCaptureService : Service() {
             intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
         }
 
-        val serverIp = intent?.getStringExtra(EXTRA_SERVER_IP) ?: ""
-        val serverPort = intent?.getIntExtra(EXTRA_SERVER_PORT, 4848) ?: 4848
+        val rawServerIp = intent?.getStringExtra(EXTRA_SERVER_IP) ?: ""
         val roomPin = intent?.getStringExtra(EXTRA_ROOM_PIN) ?: "777888"
 
-        if (resultCode != 0 && resultData != null && serverIp.isNotEmpty()) {
-            connectSocketAndStartStreaming(resultCode, resultData, serverIp, serverPort, roomPin)
+        if (resultCode != 0 && resultData != null && rawServerIp.isNotEmpty()) {
+            val (host, port) = parseHostAndPort(rawServerIp)
+            connectSocketAndStartStreaming(resultCode, resultData, host, port, roomPin)
         } else {
             stopSelf()
         }
@@ -96,8 +119,8 @@ class ScreenCaptureService : Service() {
     private fun connectSocketAndStartStreaming(
         resultCode: Int,
         resultData: Intent,
-        serverIp: String,
-        serverPort: Int,
+        host: String,
+        port: Int,
         roomPin: String
     ) {
         streamJob = CoroutineScope(Dispatchers.IO).launch {
@@ -106,7 +129,7 @@ class ScreenCaptureService : Service() {
                     reconnection = true
                     timeout = 10000
                 }
-                val socketUrl = "http://$serverIp:$serverPort"
+                val socketUrl = "http://$host:$port"
                 socket = IO.socket(socketUrl, opts)
                 socket?.connect()
 
@@ -118,13 +141,23 @@ class ScreenCaptureService : Service() {
                     }
                     socket?.emit("join-as-sender", joinData)
                     socket?.emit("join-room", joinData)
+
+                    // Muvaffaqiyatli ulanish xabari
+                    sendBroadcast(Intent(ACTION_STREAM_CONNECTED).setPackage(packageName))
                 }
 
-                // MediaProjection olish
+                socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
+                    val err = if (args.isNotEmpty()) args[0].toString() else "Ulanish xatosi"
+                    val failIntent = Intent(ACTION_STREAM_FAILED).apply {
+                        setPackage(packageName)
+                        putExtra("ERROR_MSG", err)
+                    }
+                    sendBroadcast(failIntent)
+                }
+
                 val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
 
-                // Android 14 da callback ro'yxatdan o'tishi shart!
                 mediaProjection?.registerCallback(object : MediaProjection.Callback() {
                     override fun onStop() {
                         stopSelf()
@@ -200,7 +233,7 @@ class ScreenCaptureService : Service() {
                         }
                         bitmap.recycle()
                     } catch (e: Exception) {
-                        // Kadr o'tkazib yuboriladi
+                        // Kadr o'tkaziladi
                     } finally {
                         image.close()
                     }
@@ -224,6 +257,8 @@ class ScreenCaptureService : Service() {
         socket?.emit("stop-stream")
         socket?.emit("stop-streaming")
         socket?.disconnect()
+
+        sendBroadcast(Intent(ACTION_STREAM_STOPPED).setPackage(packageName))
     }
 
     private fun createNotificationChannel() {
