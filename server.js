@@ -4,9 +4,11 @@ const { Server } = require('socket.io');
 const os = require('os');
 const path = require('path');
 const QRCode = require('qrcode');
+const dgram = require('dgram');
 
 const app = express();
 const PORT = 4848;
+const UDP_PORT = 4847;
 const PRO_SECRET_CODE = "SCREEN-PRO-7777";
 
 const server = http.createServer(app);
@@ -30,15 +32,42 @@ function getLocalIpAddress() {
 
 const localIp = getLocalIpAddress();
 const serverUrl = `http://${localIp}:${PORT}`;
+const computerName = os.hostname() || "Kompyuter (PC)";
 
 const rooms = {};
+
+// UDP Broadcast Beacon: Wi-Fi tarmog'idagi telefonlarga avtomatik o'zini bildirish
+const udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+udpSocket.bind(() => {
+    try {
+        udpSocket.setBroadcast(true);
+    } catch (e) {
+        console.log("UDP broadcast xatosi:", e.message);
+    }
+});
+
+setInterval(() => {
+    try {
+        const beacon = JSON.stringify({
+            app: "ScreenSharePro",
+            name: computerName,
+            ip: localIp,
+            port: PORT,
+            type: "pc"
+        });
+        udpSocket.send(beacon, 0, beacon.length, UDP_PORT, '255.255.255.255');
+    } catch (err) {
+        // tarmoq o'zgarganda xato bermasligi uchun
+    }
+}, 2000);
 
 io.on('connection', (socket) => {
     socket.on('join-room', ({ roomId, deviceName, deviceType, isPro }) => {
         socket.join(roomId);
         socket.roomId = roomId;
         socket.deviceName = deviceName || 'Noma\'lum';
-        socket.deviceType = deviceType || 'pc';
+        socket.deviceType = deviceType || 'phone';
         socket.isPro = isPro || false;
 
         if (!rooms[roomId]) {
@@ -62,7 +91,6 @@ io.on('connection', (socket) => {
             streamerId: rooms[roomId].streamerId
         });
 
-        // Agar efir ketayotgan bo'lsa, yangi qo'shilgan qurilmaga avtomatik stream ulaymiz
         if (rooms[roomId].streamerId && rooms[roomId].streamerId !== socket.id) {
             io.to(rooms[roomId].streamerId).emit('device-joined', {
                 newDeviceId: socket.id
@@ -81,7 +109,7 @@ io.on('connection', (socket) => {
                     streamerId: rooms[socket.roomId].streamerId
                 });
             }
-            callback({ success: true, message: "PRO rejim muvaffaqiyatli faollashtirildi!" });
+            callback({ success: true, message: "PRO rejim faollashtirildi!" });
         } else {
             callback({ success: false, message: "Noto'g'ri kalit!" });
         }
@@ -98,7 +126,6 @@ io.on('connection', (socket) => {
             isPro: socket.isPro
         });
 
-        // Xonadagi barcha boshqa a'zolarga ulanish
         const others = rooms[roomId].devices.filter(d => d.id !== socket.id);
         others.forEach(dev => {
             socket.emit('connect-to-peer', { targetId: dev.id });
@@ -112,6 +139,13 @@ io.on('connection', (socket) => {
         if (rooms[roomId].streamerId === socket.id) {
             rooms[roomId].streamerId = null;
             io.to(roomId).emit('streamer-changed', { streamerId: null });
+        }
+    });
+
+    socket.on('mobile-frame', (frameData) => {
+        const roomId = socket.roomId;
+        if (roomId) {
+            socket.to(roomId).emit('mobile-frame', frameData);
         }
     });
 
@@ -147,6 +181,7 @@ app.get('/api/info', async (req, res) => {
     try {
         const qrCodeDataUrl = await QRCode.toDataURL(serverUrl);
         res.json({
+            name: computerName,
             ip: localIp,
             port: PORT,
             url: serverUrl,
@@ -159,8 +194,9 @@ app.get('/api/info', async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================================`);
-    console.log(`🚀 SCREEN SHARE SERVER ISHGA TUSHDI!`);
+    console.log(`🚀 SCREEN SHARE PRO SERVER`);
+    console.log(`💻 Qurilma: ${computerName}`);
     console.log(`📡 Manzil: ${serverUrl}`);
-    console.log(`🔑 Master PRO Kod: ${PRO_SECRET_CODE}`);
+    console.log(`📡 UDP Avto-qidiruv mayog'i yoqildi (port: ${UDP_PORT})`);
     console.log(`=================================================`);
 });

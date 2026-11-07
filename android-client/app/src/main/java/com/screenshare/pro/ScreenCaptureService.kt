@@ -6,18 +6,33 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import io.socket.client.IO
+import io.socket.client.Socket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 
 class ScreenCaptureService : Service() {
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
+    private var imageReader: ImageReader? = null
+    private var socket: Socket? = null
+    private var streamJob: Job? = null
 
     companion object {
         const val CHANNEL_ID = "ScreenCaptureServiceChannel"
@@ -35,47 +50,137 @@ class ScreenCaptureService : Service() {
         createNotificationChannel()
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ScreenShare Pro")
-            .setContentText("Ekran jonli efirda uzatilmoqda...")
-            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentText("Telefon ekrani kompyuterga uzatilmoqda...")
+            .setSmallIcon(android.R.drawable.stat_sys_upload)
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
         val resultData = intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+        val serverIp = intent?.getStringExtra(EXTRA_SERVER_IP) ?: ""
+        val roomPin = intent?.getStringExtra(EXTRA_ROOM_PIN) ?: "777888"
 
-        if (resultCode != 0 && resultData != null) {
-            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
-            setupVirtualDisplay()
+        if (resultCode != 0 && resultData != null && serverIp.isNotEmpty()) {
+            connectSocketAndStartStreaming(resultCode, resultData, serverIp, roomPin)
         }
 
         return START_NOT_STICKY
     }
 
-    private fun setupVirtualDisplay() {
-        val metrics = resources.displayMetrics
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val density = metrics.densityDpi
+    private fun connectSocketAndStartStreaming(
+        resultCode: Int,
+        resultData: Intent,
+        serverIp: String,
+        roomPin: String
+    ) {
+        streamJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val opts = IO.Options().apply {
+                    reconnection = true
+                    timeout = 5000
+                }
+                socket = IO.socket("http://$serverIp:4848", opts)
+                socket?.connect()
 
-        // VirtualDisplay orqali kadrlarni uzatish
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "ScreenSharingDisplay",
-            width,
-            height,
-            density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            null,
-            null,
-            null
-        )
+                socket?.on(Socket.EVENT_CONNECT) {
+                    val joinData = JSONObject().apply {
+                        put("roomId", roomPin)
+                        put("deviceName", Build.MODEL ?: "Android Telefon")
+                        put("deviceType", "phone")
+                        put("isPro", true)
+                    }
+                    socket?.emit("join-room", joinData)
+                    socket?.emit("start-streaming")
+                }
+
+                // MediaProjection sozlash
+                val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
+
+                val metrics = resources.displayMetrics
+                val width = 720
+                val height = (720f * (metrics.heightPixels.toFloat() / metrics.widthPixels.toFloat())).toInt()
+                val density = metrics.densityDpi
+
+                imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+
+                virtualDisplay = mediaProjection?.createVirtualDisplay(
+                    "ScreenSharingDisplay",
+                    width,
+                    height,
+                    density,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    imageReader?.surface,
+                    null,
+                    null
+                )
+
+                var lastFrameTime = 0L
+                val frameInterval = 1000L / 30L // 30 FPS
+
+                imageReader?.setOnImageAvailableListener({ reader ->
+                    if (!isActive) return@setOnImageAvailableListener
+                    val now = System.currentTimeMillis()
+                    if (now - lastFrameTime < frameInterval) {
+                        val image = reader.acquireLatestImage()
+                        image?.close()
+                        return@setOnImageAvailableListener
+                    }
+                    lastFrameTime = now
+
+                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                    try {
+                        val planes = image.planes
+                        val buffer = planes[0].buffer
+                        val pixelStride = planes[0].pixelStride
+                        val rowStride = planes[0].rowStride
+                        val rowPadding = rowStride - pixelStride * width
+
+                        val bitmap = Bitmap.createBitmap(
+                            width + rowPadding / pixelStride,
+                            height,
+                            Bitmap.Config.ARGB_8888
+                        )
+                        bitmap.copyPixelsFromBuffer(buffer)
+
+                        val croppedBitmap = if (rowPadding > 0) {
+                            Bitmap.createBitmap(bitmap, 0, 0, width, height)
+                        } else {
+                            bitmap
+                        }
+
+                        val baos = ByteArrayOutputStream()
+                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+                        val jpegBytes = baos.toByteArray()
+
+                        if (socket?.connected() == true) {
+                            socket?.emit("mobile-frame", jpegBytes)
+                        }
+
+                        if (croppedBitmap != bitmap) bitmap.recycle()
+                        croppedBitmap.recycle()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        image.close()
+                    }
+                }, null)
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        streamJob?.cancel()
         virtualDisplay?.release()
+        imageReader?.close()
         mediaProjection?.stop()
+        socket?.emit("stop-streaming")
+        socket?.disconnect()
     }
 
     private fun createNotificationChannel() {
@@ -83,7 +188,7 @@ class ScreenCaptureService : Service() {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 "Screen Capture Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(serviceChannel)

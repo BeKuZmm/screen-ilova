@@ -1,8 +1,0 @@
-<resources>
-    <style name="Theme.ScreenSharePro" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryDark">@color/primary_dark</item>
-        <item name="android:windowBackground">@color/background</item>
-        <item name="android:statusBarColor">@color/background</item>
-    </style>
-</resources>

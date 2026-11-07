@@ -16,8 +16,32 @@ const sessionTimerBadge = document.getElementById('sessionTimerBadge');
 const timerDisplay = document.getElementById('timerDisplay');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const remoteVideo = document.getElementById('remoteVideo');
+const mobileCanvas = document.getElementById('mobileCanvas');
+const mobileCtx = mobileCanvas ? mobileCanvas.getContext('2d') : null;
 const emptyVideoState = document.getElementById('emptyVideoState');
 const appWatermark = document.getElementById('appWatermark');
+
+// Mobil kadrlarni chizish
+const mobileImg = new Image();
+mobileImg.onload = () => {
+    if (mobileCanvas && mobileCtx) {
+        mobileCanvas.width = mobileImg.width;
+        mobileCanvas.height = mobileImg.height;
+        mobileCtx.drawImage(mobileImg, 0, 0);
+    }
+};
+
+let previousBlobUrl = null;
+socket.on('mobile-frame', (arrayBuffer) => {
+    if (previousBlobUrl) URL.revokeObjectURL(previousBlobUrl);
+    const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+    previousBlobUrl = URL.createObjectURL(blob);
+    mobileImg.src = previousBlobUrl;
+
+    remoteVideo.style.display = 'none';
+    if (mobileCanvas) mobileCanvas.style.display = 'block';
+    emptyVideoState.style.display = 'none';
+});
 
 // PRO MODAL
 const proModal = document.getElementById('proModal');
@@ -113,6 +137,8 @@ socket.on('room-users', ({ devices, streamerId }) => {
 socket.on('streamer-changed', ({ streamerId, streamerName }) => {
     if (!streamerId) {
         remoteVideo.srcObject = null;
+        remoteVideo.style.display = 'block';
+        if (mobileCanvas) mobileCanvas.style.display = 'none';
         emptyVideoState.style.display = 'flex';
         resetTimer();
     } else if (streamerId !== socket.id) {
