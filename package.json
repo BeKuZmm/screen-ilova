@@ -5,7 +5,34 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "server": "node server.js"
+    "server": "node server.js",
+    "build:win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.screenshare.pro",
+    "productName": "ScreenShare PRO",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ]
   },
   "keywords": [
     "screen-sharing",
@@ -15,7 +42,7 @@
     "tv",
     "windows"
   ],
-  "author": "",
+  "author": "BeKuZmm",
   "license": "MIT",
   "dependencies": {
     "express": "^4.19.2",
@@ -24,6 +51,7 @@
     "socket.io": "^4.7.5"
   },
   "devDependencies": {
-    "electron": "^30.0.0"
+    "electron": "^30.0.0",
+    "electron-builder": "^26.18.0"
   }
 }
