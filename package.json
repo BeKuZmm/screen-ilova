@@ -6,12 +6,11 @@
   "scripts": {
     "start": "electron .",
     "server": "node server.js",
-    "build:win": "electron-builder --win --publish never"
+    "build:win": "electron-builder --win -p never"
   },
   "build": {
     "appId": "com.screenshare.pro",
     "productName": "ScreenShare PRO",
-    "publish": "never",
     "directories": {
       "output": "dist"
     },
