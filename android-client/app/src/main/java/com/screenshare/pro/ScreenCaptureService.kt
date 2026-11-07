@@ -11,6 +11,10 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioPlaybackCaptureConfiguration
+import android.media.AudioRecord
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -26,6 +30,7 @@ import io.socket.client.Socket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -37,6 +42,9 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var socket: Socket? = null
     private var streamJob: Job? = null
+
+    private var audioRecord: AudioRecord? = null
+    private var audioJob: Job? = null
 
     private var handlerThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -83,7 +91,7 @@ class ScreenCaptureService : Service() {
 
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ScreenShare Pro")
-            .setContentText("Telefon ekrani kompyuterga uzatilmoqda...")
+            .setContentText("Telefon ekrani va ichki ovozi kompyuterga uzatilmoqda...")
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -127,7 +135,6 @@ class ScreenCaptureService : Service() {
         port: Int,
         roomPin: String
     ) {
-        // Fon oqimini Looper bilan yaratish (ImageReader xabarlari uchun shart!)
         handlerThread = HandlerThread("ScreenCaptureLoop").apply { start() }
         backgroundHandler = Handler(handlerThread!!.looper)
 
@@ -171,6 +178,10 @@ class ScreenCaptureService : Service() {
                     }
                 }, Handler(Looper.getMainLooper()))
 
+                // 1. ICHKI AUDIONI USHLASH VA UZATISH (Android 10+)
+                startInternalAudioCapture(mediaProjection!!)
+
+                // 2. EKRANNI SURATGA OLISH VA UZATISH
                 val metrics = resources.displayMetrics
                 val screenWidth = metrics.widthPixels
                 val screenHeight = metrics.heightPixels
@@ -251,9 +262,63 @@ class ScreenCaptureService : Service() {
         }
     }
 
+    // ANDROID 10+ ICHKI TIZIM OVOZINI YOZIB OLISH
+    private fun startInternalAudioCapture(projection: MediaProjection) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val playbackConfig = AudioPlaybackCaptureConfiguration.Builder(projection)
+                    .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                    .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                    .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                    .build()
+
+                val sampleRate = 44100
+                val channelConfig = AudioFormat.CHANNEL_IN_STEREO
+                val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+                val minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+                val bufferSize = minBufSize.coerceAtLeast(4096)
+
+                audioRecord = AudioRecord.Builder()
+                    .setAudioPlaybackCaptureConfig(playbackConfig)
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(audioFormat)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(channelConfig)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(bufferSize)
+                    .build()
+
+                audioRecord?.startRecording()
+
+                audioJob = CoroutineScope(Dispatchers.IO).launch {
+                    val buffer = ByteArray(2048)
+                    while (isActive && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                        val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                        if (read > 0 && socket?.connected() == true) {
+                            val audioBytes = buffer.copyOf(read)
+                            socket?.emit("audio-frame", audioBytes)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         streamJob?.cancel()
+        audioJob?.cancel()
+
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+        } catch (e: Exception) {}
+        audioRecord = null
+
         try {
             virtualDisplay?.release()
             imageReader?.close()

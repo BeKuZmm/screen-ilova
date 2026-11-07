@@ -6,7 +6,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.projection.MediaProjectionManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -73,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private var targetRoomPin = "777888"
 
     private var receiverSocket: Socket? = null
+    private var receiverAudioTrack: AudioTrack? = null
     private var udpDiscoveryJob: Job? = null
 
     // BROADCAST RECEIVER (Xizmat holatini tinglash)
@@ -82,7 +87,7 @@ class MainActivity : AppCompatActivity() {
                 ScreenCaptureService.ACTION_STREAM_CONNECTED -> {
                     tvStreamingLiveBadge.text = "🟢  JONLI EFIR UZATILMOQDA"
                     tvStreamingLiveBadge.setTextColor(0xFF10B981.toInt())
-                    Toast.makeText(this@MainActivity, "Kompyuterga ulandi! Efir boshlandi.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Kompyuterga ulandi! Efir va ichki ovoz boshlandi.", Toast.LENGTH_SHORT).show()
                 }
                 ScreenCaptureService.ACTION_STREAM_FAILED -> {
                     val errorMsg = intent.getStringExtra("ERROR_MSG") ?: "Ulanish xatosi"
@@ -108,7 +113,7 @@ class MainActivity : AppCompatActivity() {
                 etTargetIp.setText(ip)
                 etTargetPin.setText(pin)
                 Toast.makeText(this, "QR o'qildi: $ip (PIN: $pin)", Toast.LENGTH_SHORT).show()
-                requestScreenProjection()
+                checkAudioPermissionAndProject()
             } else {
                 Toast.makeText(this, "QR-koddan IP manzil topilmadi!", Toast.LENGTH_LONG).show()
             }
@@ -155,11 +160,9 @@ class MainActivity : AppCompatActivity() {
 
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
-        // Standart qiymatlarni o'rnatish
         etTargetIp.setText(targetServerIp)
         etTargetPin.setText(targetRoomPin)
 
-        // Wi-Fi tekshirish
         checkNetworkStatus()
 
         // 1. QR Kod skanerlash
@@ -167,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             launchQrScanner()
         }
 
-        // 2. To'g'ridan-to'g'ri kartadagi ULANISH tugmasi
+        // 2. Kartadagi ULANISH tugmasi
         btnConnectManual.setOnClickListener {
             val rawIp = etTargetIp.text.toString().trim()
             val pin = etTargetPin.text.toString().trim().ifEmpty { "777888" }
@@ -177,7 +180,7 @@ class MainActivity : AppCompatActivity() {
                 targetServerIp = cleanHost
                 targetServerPort = cleanPort
                 targetRoomPin = pin
-                requestScreenProjection()
+                checkAudioPermissionAndProject()
             } else {
                 Toast.makeText(this, "Iltimos, kompyuter IP manzilini kiriting!", Toast.LENGTH_SHORT).show()
             }
@@ -286,6 +289,23 @@ class MainActivity : AppCompatActivity() {
         return Triple(cleanHost, cleanPort, "777888")
     }
 
+    private fun checkAudioPermissionAndProject() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1002)
+                return
+            }
+        }
+        requestScreenProjection()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1002) {
+            requestScreenProjection()
+        }
+    }
+
     private fun requestScreenProjection() {
         projectionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
     }
@@ -377,6 +397,32 @@ class MainActivity : AppCompatActivity() {
         layoutReceiverWaiting.visibility = View.VISIBLE
 
         try {
+            // Kompyuter audio oqimini telefonda ijro etish uchun AudioTrack
+            val sampleRate = 44100
+            val channelConfig = AudioFormat.CHANNEL_OUT_STEREO
+            val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+            val minBufSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat).coerceAtLeast(4096)
+
+            receiverAudioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(audioFormat)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(channelConfig)
+                        .build()
+                )
+                .setBufferSizeInBytes(minBufSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+
+            receiverAudioTrack?.play()
+
             val opts = IO.Options().apply { reconnection = true }
             val socketUrl = "http://$host:$port"
             receiverSocket = IO.socket(socketUrl, opts)
@@ -389,6 +435,16 @@ class MainActivity : AppCompatActivity() {
                 }
                 receiverSocket?.emit("join-as-receiver", joinData)
                 receiverSocket?.emit("join-room", joinData)
+            }
+
+            // Kompyuterdan kelgan audio kadrlarini ijro etish
+            receiverSocket?.on("pc-audio-frame") { args ->
+                if (args.isNotEmpty()) {
+                    val data = args[0]
+                    if (data is ByteArray) {
+                        receiverAudioTrack?.write(data, 0, data.size)
+                    }
+                }
             }
 
             val frameListener: (Array<Any>) -> Unit = { args ->
@@ -425,6 +481,12 @@ class MainActivity : AppCompatActivity() {
         receiverSocket?.disconnect()
         receiverSocket = null
         ivReceivedScreen.setImageBitmap(null)
+
+        try {
+            receiverAudioTrack?.stop()
+            receiverAudioTrack?.release()
+        } catch (e: Exception) {}
+        receiverAudioTrack = null
 
         layoutReceiverActive.visibility = View.GONE
         layoutStreamingActive.visibility = View.GONE

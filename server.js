@@ -152,6 +152,39 @@ io.on('connection', (socket) => {
     socket.on('screen-frame', handleIncomingFrame);
     socket.on('mobile-frame', handleIncomingFrame);
 
+    // Audio oqimi (Telefon ichki ovozini kompyuterga uzatish)
+    socket.on('audio-frame', (audioBuffer) => {
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('audio-frame', audioBuffer);
+        socket.broadcast.emit('audio-frame', audioBuffer);
+    });
+
+    // Audio oqimi (Kompyuter tizim ovozini telefonga uzatish)
+    socket.on('pc-audio-frame', (audioBuffer) => {
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('pc-audio-frame', audioBuffer);
+        socket.broadcast.emit('pc-audio-frame', audioBuffer);
+    });
+
+    // WebRTC Signallari (Video va Ovoz uchun)
+    socket.on('webrtc-offer', (payload) => {
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('webrtc-offer', payload);
+        socket.broadcast.emit('webrtc-offer', payload);
+    });
+
+    socket.on('webrtc-answer', (payload) => {
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('webrtc-answer', payload);
+        socket.broadcast.emit('webrtc-answer', payload);
+    });
+
+    socket.on('webrtc-ice-candidate', (payload) => {
+        const pin = socket.roomPin || DEFAULT_ROOM_PIN;
+        socket.to(pin).emit('webrtc-ice-candidate', payload);
+        socket.broadcast.emit('webrtc-ice-candidate', payload);
+    });
+
     // 4. Efirni to'xtatish
     const handleStopStream = () => {
         const pin = socket.roomPin || DEFAULT_ROOM_PIN;
