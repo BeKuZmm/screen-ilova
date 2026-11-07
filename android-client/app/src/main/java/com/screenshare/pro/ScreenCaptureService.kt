@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -14,7 +15,9 @@ import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -49,23 +52,42 @@ class ScreenCaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
+
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ScreenShare Pro")
             .setContentText("Telefon ekrani kompyuterga uzatilmoqda...")
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        // Android 14+ da ForegroundServiceType majburiy
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, 0) ?: 0
-        val resultData = intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+        val resultData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+        }
+
         val serverIp = intent?.getStringExtra(EXTRA_SERVER_IP) ?: ""
         val serverPort = intent?.getIntExtra(EXTRA_SERVER_PORT, 4848) ?: 4848
         val roomPin = intent?.getStringExtra(EXTRA_ROOM_PIN) ?: "777888"
 
         if (resultCode != 0 && resultData != null && serverIp.isNotEmpty()) {
             connectSocketAndStartStreaming(resultCode, resultData, serverIp, serverPort, roomPin)
+        } else {
+            stopSelf()
         }
 
         return START_NOT_STICKY
@@ -82,7 +104,7 @@ class ScreenCaptureService : Service() {
             try {
                 val opts = IO.Options().apply {
                     reconnection = true
-                    timeout = 6000
+                    timeout = 10000
                 }
                 val socketUrl = "http://$serverIp:$serverPort"
                 socket = IO.socket(socketUrl, opts)
@@ -98,20 +120,32 @@ class ScreenCaptureService : Service() {
                     socket?.emit("join-room", joinData)
                 }
 
+                // MediaProjection olish
                 val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
 
+                // Android 14 da callback ro'yxatdan o'tishi shart!
+                mediaProjection?.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        stopSelf()
+                    }
+                }, Handler(Looper.getMainLooper()))
+
                 val metrics = resources.displayMetrics
-                val width = 720
-                val height = (720f * (metrics.heightPixels.toFloat() / metrics.widthPixels.toFloat())).toInt()
+                val screenWidth = metrics.widthPixels
+                val screenHeight = metrics.heightPixels
                 val density = metrics.densityDpi
 
-                imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
+                val targetWidth = 720
+                var targetHeight = (720f * (screenHeight.toFloat() / screenWidth.toFloat())).toInt()
+                if (targetHeight % 2 != 0) targetHeight += 1
+
+                imageReader = ImageReader.newInstance(targetWidth, targetHeight, PixelFormat.RGBA_8888, 3)
 
                 virtualDisplay = mediaProjection?.createVirtualDisplay(
-                    "ScreenSharingDisplay",
-                    width,
-                    height,
+                    "ScreenShareDisplay",
+                    targetWidth,
+                    targetHeight,
                     density,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     imageReader?.surface,
@@ -124,37 +158,36 @@ class ScreenCaptureService : Service() {
 
                 imageReader?.setOnImageAvailableListener({ reader ->
                     if (!isActive) return@setOnImageAvailableListener
+                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     val now = System.currentTimeMillis()
                     if (now - lastFrameTime < frameInterval) {
-                        val image = reader.acquireLatestImage()
-                        image?.close()
+                        image.close()
                         return@setOnImageAvailableListener
                     }
                     lastFrameTime = now
 
-                    val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     try {
                         val planes = image.planes
                         val buffer = planes[0].buffer
                         val pixelStride = planes[0].pixelStride
                         val rowStride = planes[0].rowStride
-                        val rowPadding = rowStride - pixelStride * width
+                        val rowPadding = rowStride - pixelStride * targetWidth
 
                         val bitmap = Bitmap.createBitmap(
-                            width + rowPadding / pixelStride,
-                            height,
+                            targetWidth + rowPadding / pixelStride,
+                            targetHeight,
                             Bitmap.Config.ARGB_8888
                         )
                         bitmap.copyPixelsFromBuffer(buffer)
 
-                        val croppedBitmap = if (rowPadding > 0) {
-                            Bitmap.createBitmap(bitmap, 0, 0, width, height)
+                        val finalBitmap = if (rowPadding > 0) {
+                            Bitmap.createBitmap(bitmap, 0, 0, targetWidth, targetHeight)
                         } else {
                             bitmap
                         }
 
                         val baos = ByteArrayOutputStream()
-                        croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 65, baos)
+                        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 65, baos)
                         val jpegBytes = baos.toByteArray()
 
                         if (socket?.connected() == true) {
@@ -162,10 +195,12 @@ class ScreenCaptureService : Service() {
                             socket?.emit("mobile-frame", jpegBytes)
                         }
 
-                        if (croppedBitmap != bitmap) bitmap.recycle()
-                        croppedBitmap.recycle()
+                        if (finalBitmap != bitmap) {
+                            finalBitmap.recycle()
+                        }
+                        bitmap.recycle()
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        // Kadr o'tkazib yuboriladi
                     } finally {
                         image.close()
                     }
@@ -180,9 +215,12 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         streamJob?.cancel()
-        virtualDisplay?.release()
-        imageReader?.close()
-        mediaProjection?.stop()
+        try {
+            virtualDisplay?.release()
+            imageReader?.close()
+            mediaProjection?.stop()
+        } catch (e: Exception) {}
+
         socket?.emit("stop-stream")
         socket?.emit("stop-streaming")
         socket?.disconnect()
@@ -192,7 +230,7 @@ class ScreenCaptureService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "Screen Capture Service Channel",
+                "Screen Capture Service",
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)

@@ -36,37 +36,34 @@ import java.net.URI
 
 class MainActivity : AppCompatActivity() {
 
-    // LAYOUTS
+    // LAYOUTLAR
     private lateinit var layoutModeSelection: LinearLayout
     private lateinit var layoutStreamingActive: LinearLayout
     private lateinit var layoutReceiverActive: RelativeLayout
     private lateinit var layoutReceiverWaiting: LinearLayout
 
-    // CONTROLS - MODE SELECTION
+    // ASOSIY SAHIFA ELEMENTLARI
     private lateinit var btnScanQr: Button
     private lateinit var btnManualPin: Button
     private lateinit var btnOpenReceiver: Button
     private lateinit var tvHeaderStatus: TextView
 
-    // CONTROLS - STREAMING ACTIVE
+    // EFIR HOLATI ELEMENTLARI
     private lateinit var tvStreamingTarget: TextView
     private lateinit var btnStopStreaming: Button
 
-    // CONTROLS - RECEIVER ACTIVE
+    // QABUL QILUVCHI ELEMENTLAR
     private lateinit var ivReceivedScreen: ImageView
     private lateinit var btnBackFromReceiver: ImageButton
-    private lateinit var tvReceiverDeviceTitle: TextView
     private lateinit var tvWaitingStreamText: TextView
-    private lateinit var tvReceiverPinHint: TextView
 
-    // MEDIA PROJECTION & CAPTURE
+    // PROJECTION & NETWORK
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private var isStreaming = false
     private var targetServerIp = ""
     private var targetServerPort = 4848
     private var targetRoomPin = "777888"
 
-    // RECEIVER SOCKET
     private var receiverSocket: Socket? = null
     private var udpDiscoveryJob: Job? = null
 
@@ -79,17 +76,17 @@ class MainActivity : AppCompatActivity() {
                 targetServerIp = ip
                 targetServerPort = port
                 targetRoomPin = pin
-                Toast.makeText(this, "QR muvaffaqiyatli o'qildi: $ip:$port (PIN: $pin)", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "QR o'qildi: $ip (PIN: $pin)", Toast.LENGTH_SHORT).show()
                 requestScreenProjection()
             } else {
-                Toast.makeText(this, "QR-koddan IP manzil aniqlanmadi!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "QR-koddan IP manzil topilmadi!", Toast.LENGTH_LONG).show()
             }
         } else {
             Toast.makeText(this, "Skanerlash bekor qilindi", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // MEDIA PROJECTION LAUNCHER
+    // PROJECTION RUXSAT LAUNCHER
     private val projectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -104,7 +101,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Viewlarni bog'lash
         layoutModeSelection = findViewById(R.id.layoutModeSelection)
         layoutStreamingActive = findViewById(R.id.layoutStreamingActive)
         layoutReceiverActive = findViewById(R.id.layoutReceiverActive)
@@ -120,24 +116,21 @@ class MainActivity : AppCompatActivity() {
 
         ivReceivedScreen = findViewById(R.id.ivReceivedScreen)
         btnBackFromReceiver = findViewById(R.id.btnBackFromReceiver)
-        tvReceiverDeviceTitle = findViewById(R.id.tvReceiverDeviceTitle)
         tvWaitingStreamText = findViewById(R.id.tvWaitingStreamText)
-        tvReceiverPinHint = findViewById(R.id.tvReceiverPinHint)
 
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
-        // TUGMALARNI SOZLASH
-        // 1. QR Kod skanerlash
+        // 1. Asosiy tugma: QR Kod skanerlash
         btnScanQr.setOnClickListener {
             launchQrScanner()
         }
 
-        // 2. PIN va IP orqali qo'lda ulanish
+        // 2. PIN va IP orqali ulanish
         btnManualPin.setOnClickListener {
             showManualConnectDialog()
         }
 
-        // 3. Qabul qiluvchi rejim
+        // 3. Ekranni qabul qilish
         btnOpenReceiver.setOnClickListener {
             showReceiverDialog()
         }
@@ -147,20 +140,18 @@ class MainActivity : AppCompatActivity() {
             stopStreamingService()
         }
 
-        // 5. Receiver oynasidan chiqish
+        // 5. Qabul qilishdan chiqish
         btnBackFromReceiver.setOnClickListener {
             stopReceiverMode()
         }
 
-        // UDP orqali kompyuterni fonga qidirib ko'rish
         startPassiveUdpDiscovery()
     }
 
-    // QR-KOD SKANERNI ISHGA TUSHIRISH
     private fun launchQrScanner() {
         val options = ScanOptions().apply {
             setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            setPrompt("Kompyuter ekranidagi QR-kodni skanerlang")
+            setPrompt("Kompyuter ekranidagi QR-kodga qarating")
             setCameraId(0)
             setBeepEnabled(true)
             setBarcodeImageEnabled(false)
@@ -169,9 +160,7 @@ class MainActivity : AppCompatActivity() {
         barcodeLauncher.launch(options)
     }
 
-    // QR DATA PARSER
     private fun parseQrData(content: String): Triple<String, Int, String> {
-        // 1. JSON format
         try {
             if (content.startsWith("{")) {
                 val json = JSONObject(content)
@@ -182,7 +171,6 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {}
 
-        // 2. URL format: http://192.168.1.5:4848?pin=123456
         try {
             val uri = URI(content)
             val host = uri.host
@@ -197,7 +185,6 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {}
 
-        // 3. IP:PORT format
         if (content.contains(":")) {
             val parts = content.split(":")
             val ip = parts[0].trim()
@@ -205,16 +192,13 @@ class MainActivity : AppCompatActivity() {
             return Triple(ip, port, "777888")
         }
 
-        // 4. Faqat IP
         return Triple(content.trim(), 4848, "777888")
     }
 
-    // EKRAN YUBORISH UCHUN RUXSAT SO'RASH
     private fun requestScreenProjection() {
         projectionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
     }
 
-    // EFIR XIZMATINI BOSHLASH
     private fun startStreamingService(resultCode: Int, data: Intent) {
         val intent = Intent(this, ScreenCaptureService::class.java).apply {
             putExtra(ScreenCaptureService.EXTRA_RESULT_CODE, resultCode)
@@ -235,11 +219,10 @@ class MainActivity : AppCompatActivity() {
         layoutReceiverActive.visibility = View.GONE
         layoutStreamingActive.visibility = View.VISIBLE
 
-        tvStreamingTarget.text = "Kompyuter: $targetServerIp:$targetServerPort\nPIN: $targetRoomPin"
+        tvStreamingTarget.text = "Kompyuter: $targetServerIp\nXona PIN: $targetRoomPin"
         tvHeaderStatus.text = "● Efir faol"
     }
 
-    // EFIRNI TO'XTATISH
     private fun stopStreamingService() {
         val intent = Intent(this, ScreenCaptureService::class.java)
         stopService(intent)
@@ -248,21 +231,18 @@ class MainActivity : AppCompatActivity() {
         layoutStreamingActive.visibility = View.GONE
         layoutReceiverActive.visibility = View.GONE
         layoutModeSelection.visibility = View.VISIBLE
-        tvHeaderStatus.text = "● Tayyor"
+        tvHeaderStatus.text = "● Wi-Fi Tayyor"
     }
 
-    // QO'LDA ULASH DIALOGI
     private fun showManualConnectDialog() {
-        val dialogView = layoutInflater.inflate(android.R.layout.simple_list_item_1, null)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(60, 40, 60, 20)
         }
 
         val etIp = EditText(this).apply {
-            hint = "Kompyuter IP (masalan: 192.168.1.100)"
-            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "192.168.1.")
-            setSelection(text.length)
+            hint = "Kompyuter IP (masalan: 10.121.221.21)"
+            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "")
         }
 
         val etPin = EditText(this).apply {
@@ -274,16 +254,16 @@ class MainActivity : AppCompatActivity() {
         container.addView(etPin)
 
         AlertDialog.Builder(this)
-            .setTitle("Qo'lda ulanish")
-            .setMessage("Kompyuter ekrandagi IP va PIN kodni kiriting:")
+            .setTitle("Kompyuterga ulanish")
+            .setMessage("Kompyuter ekranidagi IP va PIN kodni kiriting:")
             .setView(container)
-            .setPositiveButton("Ulanish va Uzatish") { _, _ ->
+            .setPositiveButton("Ulanish") { _, _ ->
                 val ip = etIp.text.toString().trim()
-                val pin = etPin.text.toString().trim()
+                val pin = etPin.text.toString().trim().ifEmpty { "777888" }
                 if (ip.isNotEmpty()) {
                     targetServerIp = ip
                     targetServerPort = 4848
-                    targetRoomPin = if (pin.isNotEmpty()) pin else "777888"
+                    targetRoomPin = pin
                     requestScreenProjection()
                 } else {
                     Toast.makeText(this, "IP manzilni kiriting!", Toast.LENGTH_SHORT).show()
@@ -293,7 +273,6 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    // QABUL QILISH REJIMI DIALOGI
     private fun showReceiverDialog() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -301,13 +280,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         val etIp = EditText(this).apply {
-            hint = "Server IP (masalan: 192.168.1.100)"
-            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "192.168.1.")
-            setSelection(text.length)
+            hint = "Server IP (masalan: 10.121.221.21)"
+            setText(if (targetServerIp.isNotEmpty()) targetServerIp else "")
         }
 
         val etPin = EditText(this).apply {
-            hint = "Xona PIN kodi (ixtiyoriy, masalan: 777888)"
+            hint = "PIN kod (masalan: 777888)"
             setText("777888")
         }
 
@@ -316,33 +294,24 @@ class MainActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this)
             .setTitle("Ekranni Qabul Qilish")
-            .setMessage("Uzatuvchi kompyuter IP manzili va PIN kodini kiriting:")
+            .setMessage("Uzatuvchi kompyuter IP va PIN kodini kiriting:")
             .setView(container)
-            .setPositiveButton("Ko'rishni boshlash") { _, _ ->
+            .setPositiveButton("Ko'rish") { _, _ ->
                 val ip = etIp.text.toString().trim()
                 val pin = etPin.text.toString().trim().ifEmpty { "777888" }
                 if (ip.isNotEmpty()) {
                     startReceiverMode(ip, 4848, pin)
                 }
             }
-            .setNeutralButton("📷 QR Skaner orqali") { _, _ ->
-                barcodeLauncher.launch(ScanOptions().apply {
-                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                    setPrompt("Uzatuvchi ekranidagi QR-kodni skanerlang")
-                    setBeepEnabled(true)
-                })
-            }
             .setNegativeButton("Bekor qilish", null)
             .show()
     }
 
-    // QABUL QILISH REJIMINI ISHGA TUSHIRISH
     private fun startReceiverMode(ip: String, port: Int, pin: String) {
         layoutModeSelection.visibility = View.GONE
         layoutStreamingActive.visibility = View.GONE
         layoutReceiverActive.visibility = View.VISIBLE
         layoutReceiverWaiting.visibility = View.VISIBLE
-        tvReceiverPinHint.text = "PIN: $pin"
 
         try {
             val opts = IO.Options().apply { reconnection = true }
@@ -358,7 +327,6 @@ class MainActivity : AppCompatActivity() {
                 receiverSocket?.emit("join-room", joinData)
             }
 
-            // KADRLARNI QABUL QILISH
             val frameListener: (Array<Any>) -> Unit = { args ->
                 if (args.isNotEmpty()) {
                     val data = args[0]
@@ -384,9 +352,8 @@ class MainActivity : AppCompatActivity() {
                     ivReceivedScreen.setImageBitmap(null)
                 }
             }
-
         } catch (e: Exception) {
-            Toast.makeText(this, "Ulanishda xatolik: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Ulanish xatosi: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -400,7 +367,6 @@ class MainActivity : AppCompatActivity() {
         layoutModeSelection.visibility = View.VISIBLE
     }
 
-    // PASSIV UDP QIDIRUV (Wi-Fi router ruxsat bersa avtomatik IP ni oladi)
     private fun startPassiveUdpDiscovery() {
         udpDiscoveryJob = CoroutineScope(Dispatchers.IO).launch {
             var socket: DatagramSocket? = null
@@ -421,12 +387,11 @@ class MainActivity : AppCompatActivity() {
                         withContext(Dispatchers.Main) {
                             targetServerIp = ip
                             targetRoomPin = pin
-                            tvHeaderStatus.text = "● Kompyuter topildi ($ip)"
+                            tvHeaderStatus.text = "● Kompyuter topildi"
                         }
                     }
                 }
             } catch (e: Exception) {
-                // Tarmoqda UDP bloklangan bo'lsa indamay o'tadi
             } finally {
                 socket?.close()
             }

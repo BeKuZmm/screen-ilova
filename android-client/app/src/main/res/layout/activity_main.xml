@@ -3,47 +3,54 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background">
+    android:background="#080C15">
 
-    <!-- 1. ASOSIY REJIM TANLASH OYNASI (MODE SELECTION) -->
+    <!-- 1. ASOSIY REJIM OYNASI (HOME / MODE SELECTION) -->
     <LinearLayout
         android:id="@+id/layoutModeSelection"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="20dp"
+        android:padding="24dp"
         android:visibility="visible">
 
-        <!-- TOP BAR -->
+        <!-- HEADER -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="20dp">
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="28dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ScreenShare"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="PRO"
-                android:textColor="#080E1A"
-                android:background="@drawable/btn_gradient_cyan"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:layout_marginStart="8dp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ScreenShare"
+                    android:textColor="#F8FAFC"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PRO"
+                    android:textColor="#080C15"
+                    android:background="@drawable/btn_gradient_cyan"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
 
             <View
                 android:layout_width="0dp"
@@ -54,27 +61,11 @@
                 android:id="@+id/tvHeaderStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="● Tayyor"
-                android:textColor="@color/accent_green"
-                android:textSize="12sp" />
+                android:text="● Wi-Fi Tayyor"
+                android:textColor="#10B981"
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Qanday ulanmoqchisiz?"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Kerakli rejimni tanlang:"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="20dp" />
 
         <ScrollView
             android:layout_width="match_parent"
@@ -87,118 +78,119 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- KARTA 1: EKRANNI UZATISH -->
+                <!-- ASOSIY KARTA: EKRANNI KOMPYUTERGA UZATISH (PRIMARY) -->
                 <LinearLayout
                     android:id="@+id/cardCastScreen"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:background="@drawable/card_bg"
-                    android:padding="20dp"
-                    android:layout_marginBottom="18dp">
+                    android:padding="22dp"
+                    android:layout_marginBottom="20dp">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="10dp">
+                        android:layout_marginBottom="8dp">
 
                         <ImageView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:src="@android:drawable/ic_menu_upload"
-                            app:tint="@color/accent_cyan" />
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@android:drawable/stat_sys_upload"
+                            app:tint="#00E5FF" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Ekranni Uzatish"
-                            android:textColor="@color/text_primary"
-                            android:textSize="18sp"
+                            android:text="Ekranni Uzatish (Cast)"
+                            android:textColor="#F8FAFC"
+                            android:textSize="19sp"
                             android:textStyle="bold"
-                            android:layout_marginStart="12dp" />
+                            android:layout_marginStart="10dp" />
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Telefoningiz ekranini kompyuter yoki televizorga uzatish"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
-                        android:layout_marginBottom="16dp" />
+                        android:text="Telefoningiz ekranini kompyuter yoki televizor monitoriga uzatish"
+                        android:textColor="#94A3B8"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="3dp"
+                        android:layout_marginBottom="20dp" />
 
-                    <!-- QR SKANER TUGMASI -->
+                    <!-- KATTA ASOSIY QR SKANER TUGMASI -->
                     <Button
                         android:id="@+id/btnScanQr"
                         android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:text="📷 QR-KODNI SKANERLASH"
-                        android:textColor="#080E1A"
+                        android:layout_height="56dp"
+                        android:text="📷  QR-KODNI SKANERLASH"
+                        android:textColor="#080C15"
                         android:textStyle="bold"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:background="@drawable/btn_gradient_cyan"
-                        android:layout_marginBottom="10dp" />
+                        android:layout_marginBottom="12dp" />
 
-                    <!-- PIN BILAN ULASH -->
+                    <!-- 6 XONALI PIN ORQALI ULASH -->
                     <Button
                         android:id="@+id/btnManualPin"
                         android:layout_width="match_parent"
-                        android:layout_height="46dp"
-                        android:text="⌨️ PIN kod orqali ulanish"
-                        android:textColor="@color/accent_cyan"
+                        android:layout_height="48dp"
+                        android:text="⌨️  6 xonali PIN kod orqali ulanish"
+                        android:textColor="#00E5FF"
                         android:textSize="13sp"
                         android:background="@drawable/btn_card_outline" />
                 </LinearLayout>
 
-                <!-- KARTA 2: EKRANNI QABUL QILISH -->
+                <!-- IKKILAMCHI KARTA: EKRANNI QABUL QILISH -->
                 <LinearLayout
                     android:id="@+id/cardReceiveScreen"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:background="@drawable/card_bg"
-                    android:padding="20dp"
-                    android:layout_marginBottom="18dp">
+                    android:padding="22dp"
+                    android:layout_marginBottom="20dp">
 
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
-                        android:layout_marginBottom="10dp">
+                        android:layout_marginBottom="8dp">
 
                         <ImageView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
                             android:src="@android:drawable/ic_menu_view"
-                            app:tint="@color/accent_green" />
+                            app:tint="#10B981" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Ekranni Qabul Qilish"
-                            android:textColor="@color/text_primary"
-                            android:textSize="18sp"
+                            android:textColor="#F8FAFC"
+                            android:textSize="19sp"
                             android:textStyle="bold"
-                            android:layout_marginStart="12dp" />
+                            android:layout_marginStart="10dp" />
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Kompyuter yoki ikkinchi telefon ekranini ushbu telefonda ko'rish"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
-                        android:layout_marginBottom="16dp" />
+                        android:text="Kompyuter yoki boshqa telefon ekranini ushbu telefonda ko'rish"
+                        android:textColor="#94A3B8"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="3dp"
+                        android:layout_marginBottom="18dp" />
 
-                    <!-- QABUL QILISH TUGMASI -->
                     <Button
                         android:id="@+id/btnOpenReceiver"
                         android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:text="📥 Qabul qilishni boshlash"
-                        android:textColor="@color/accent_green"
+                        android:layout_height="50dp"
+                        android:text="📥  Qabul qilishni boshlash"
+                        android:textColor="#10B981"
                         android:textStyle="bold"
                         android:textSize="14sp"
                         android:background="@drawable/btn_card_outline" />
@@ -214,23 +206,23 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="28dp"
         android:gravity="center"
         android:visibility="gone">
 
         <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
             android:src="@android:drawable/stat_sys_upload"
-            app:tint="@color/accent_cyan"
-            android:layout_marginBottom="20dp" />
+            app:tint="#00E5FF"
+            android:layout_marginBottom="24dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🔴 EKRAN JONLI UZATILMOQDA"
-            android:textColor="@color/accent_cyan"
-            android:textSize="18sp"
+            android:text="🔴  JONLI EFIRDA"
+            android:textColor="#00E5FF"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:layout_marginBottom="8dp" />
 
@@ -238,23 +230,35 @@
             android:id="@+id/tvStreamingTarget"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Kompyuter: 192.168.1.5:4848"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
+            android:text="Kompyuterga uzatilmoqda..."
+            android:textColor="#94A3B8"
+            android:textSize="15sp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
             android:layout_marginBottom="36dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💡 Telefoningiz ekranidagi barcha amallar hozir kompyuterda ko'rinmoqda. Ilovani fonga tushirib ishlatishingiz mumkin."
+            android:textColor="#64748B"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:lineSpacingExtra="3dp"
+            android:layout_marginBottom="40dp" />
 
         <Button
             android:id="@+id/btnStopStreaming"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="🛑 EFIRNI TO'XTATISH"
+            android:layout_height="58dp"
+            android:text="🛑  EFIRNI TO'XTATISH"
             android:textColor="@android:color/white"
             android:textStyle="bold"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:background="@drawable/btn_danger_red" />
     </LinearLayout>
 
-    <!-- 3. JONLI EFIR QABUL QILUVCHI OYNA (RECEIVER ACTIVE) -->
+    <!-- 3. JONLI EFIR QABUL QILUVCHI OYNA (RECEIVER VIEW) -->
     <RelativeLayout
         android:id="@+id/layoutReceiverActive"
         android:layout_width="match_parent"
@@ -262,14 +266,12 @@
         android:background="#000000"
         android:visibility="gone">
 
-        <!-- KADRLARNI KO'RSATUVCHI VIEW -->
         <ImageView
             android:id="@+id/ivReceivedScreen"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitCenter" />
 
-        <!-- KUTISH XABARI -->
         <LinearLayout
             android:id="@+id/layoutReceiverWaiting"
             android:layout_width="wrap_content"
@@ -282,56 +284,47 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:indeterminate="true"
-                android:indeterminateTint="@color/accent_cyan"
+                android:indeterminateTint="#00E5FF"
                 android:layout_marginBottom="16dp" />
 
             <TextView
                 android:id="@+id/tvWaitingStreamText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Efir kutilmoqda..."
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/tvReceiverPinHint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="PIN: 777888"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:layout_marginTop="6dp" />
+                android:text="Kompyuter ekrani kutilmoqda..."
+                android:textColor="#F8FAFC"
+                android:textSize="16sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- RECEIVER TOP BAR -->
+        <!-- TOP CONTROLS -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="14dp"
+            android:padding="16dp"
             android:gravity="center_vertical"
-            android:background="#80000000"
+            android:background="#99000000"
             android:layout_alignParentTop="true">
 
             <ImageButton
                 android:id="@+id/btnBackFromReceiver"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_revert"
                 app:tint="@android:color/white"
                 android:contentDescription="Chiqish" />
 
             <TextView
-                android:id="@+id/tvReceiverDeviceTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Kompyuter ekrani"
                 android:textColor="@android:color/white"
-                android:textSize="15sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:layout_marginStart="10dp" />
+                android:layout_marginStart="12dp" />
         </LinearLayout>
     </RelativeLayout>
 
